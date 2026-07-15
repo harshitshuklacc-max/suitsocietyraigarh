@@ -84,14 +84,27 @@ export async function getWishlist(userId: string) {
 
 export async function submitReview(productId: string, userId: string, rating: number, title: string, comment: string) {
   const supabase = await createServiceClient();
-  const { error } = await supabase.from("reviews").insert({
+
+  const { data: existing } = await supabase
+    .from("reviews")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const payload = {
     product_id: productId,
     user_id: userId,
     rating,
     title,
     comment,
     is_approved: false,
-  });
+  };
+
+  const { error } = existing
+    ? await supabase.from("reviews").update(payload).eq("id", existing.id)
+    : await supabase.from("reviews").insert(payload);
+
   if (error) return { error: error.message };
   return { success: true };
 }

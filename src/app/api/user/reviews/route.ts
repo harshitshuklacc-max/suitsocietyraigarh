@@ -25,21 +25,31 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+
+  const { data: existing } = await supabase
     .from("reviews")
-    .upsert(
-      {
-        product_id,
-        user_id: session.id,
-        rating,
-        title,
-        comment,
-        is_approved: false,
-      },
-      { onConflict: "product_id,user_id" }
-    )
-    .select()
-    .single();
+    .select("id")
+    .eq("product_id", product_id)
+    .eq("user_id", session.id)
+    .maybeSingle();
+
+  const reviewPayload = {
+    product_id,
+    user_id: session.id,
+    rating,
+    title,
+    comment,
+    is_approved: false,
+  };
+
+  const { data, error } = existing
+    ? await supabase
+        .from("reviews")
+        .update(reviewPayload)
+        .eq("id", existing.id)
+        .select()
+        .single()
+    : await supabase.from("reviews").insert(reviewPayload).select().single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ review: data, message: "Review submitted for approval" });
