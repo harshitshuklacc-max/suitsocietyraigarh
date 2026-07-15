@@ -25,6 +25,14 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<Record<string, unknown>[]>([]);
   const [addresses, setAddresses] = useState<Record<string, unknown>[]>([]);
   const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
+  const [reviewForm, setReviewForm] = useState({
+    product_id: "",
+    product_name: "",
+    rating: 5,
+    title: "",
+    comment: "",
+  });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const [loginStep, setLoginStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
@@ -156,6 +164,46 @@ export default function AccountPage() {
     }
   };
 
+  const openReviewForm = (productId: string, productName: string) => {
+    setReviewForm({ product_id: productId, product_name: productName, rating: 5, title: "", comment: "" });
+    setTab("reviews");
+  };
+
+  const submitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewForm.product_id) {
+      toast.error("Select a product to review");
+      return;
+    }
+    if (!reviewForm.comment.trim()) {
+      toast.error("Please write your review");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      const res = await fetch("/api/user/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: reviewForm.product_id,
+          rating: reviewForm.rating,
+          title: reviewForm.title,
+          comment: reviewForm.comment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("Review submitted for admin approval");
+      setReviewForm({ product_id: "", product_name: "", rating: 5, title: "", comment: "" });
+      loadTabData("reviews");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit review");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -284,22 +332,58 @@ export default function AccountPage() {
           {!orders.length ? (
             <p className="text-muted-foreground text-center py-12">No orders yet</p>
           ) : (
-            orders.map((order) => (
-              <div key={String(order.id)} className="p-6 border rounded-xl">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className="font-medium">{String(order.order_number)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(String(order.created_at)).toLocaleDateString("en-IN")}
-                    </p>
+            orders.map((order) => {
+              const items = (order.order_items || order.items || []) as Array<{
+                id?: string;
+                product_id?: string;
+                product_name?: string;
+                size?: string;
+                quantity?: number;
+              }>;
+
+              return (
+                <div key={String(order.id)} className="p-6 border rounded-xl">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium">{String(order.order_number)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(String(order.created_at)).toLocaleDateString("en-IN")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{formatPrice(Number(order.total))}</p>
+                      <p className="text-sm capitalize text-muted-foreground">{String(order.status)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">{formatPrice(Number(order.total))}</p>
-                    <p className="text-sm capitalize text-muted-foreground">{String(order.status)}</p>
-                  </div>
+
+                  {items.length > 0 && (
+                    <div className="mt-4 pt-4 border-t space-y-2">
+                      {items.map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="flex justify-between items-center text-sm gap-4"
+                        >
+                          <div>
+                            <p className="font-medium">{item.product_name}</p>
+                            {item.size && (
+                              <p className="text-muted-foreground text-xs">Size: {item.size}</p>
+                            )}
+                          </div>
+                          {item.product_id && (
+                            <button
+                              onClick={() => openReviewForm(item.product_id!, item.product_name || "Product")}
+                              className="text-xs px-3 py-1.5 border rounded-lg hover:border-gold hover:text-gold shrink-0"
+                            >
+                              Write Review
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -345,9 +429,68 @@ export default function AccountPage() {
       )}
 
       {tab === "reviews" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          <form onSubmit={submitReview} className="p-6 border rounded-xl space-y-4">
+            <h3 className="font-medium">Write a Review</h3>
+            {reviewForm.product_name && (
+              <p className="text-sm text-muted-foreground">
+                Reviewing: <span className="text-charcoal font-medium">{reviewForm.product_name}</span>
+              </p>
+            )}
+            {!reviewForm.product_id && (
+              <p className="text-sm text-muted-foreground">
+                Go to your Orders tab and click &quot;Write Review&quot; on a product you purchased.
+              </p>
+            )}
+            <div>
+              <label className="block text-sm mb-2">Rating</label>
+              <div className="flex gap-1">
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const value = i + 1;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setReviewForm({ ...reviewForm, rating: value })}
+                      className="text-xl"
+                    >
+                      <span className={value <= reviewForm.rating ? "text-gold" : "text-muted"}>★</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Title (optional)</label>
+              <input
+                value={reviewForm.title}
+                onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-gold"
+                placeholder="Summarize your experience"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Your Review</label>
+              <textarea
+                required
+                value={reviewForm.comment}
+                onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                rows={4}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-gold resize-none"
+                placeholder="Share your experience with this product..."
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={reviewSubmitting || !reviewForm.product_id}
+              className="px-6 py-2 bg-gold text-charcoal rounded-lg text-sm font-medium disabled:opacity-50"
+            >
+              {reviewSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Review"}
+            </button>
+          </form>
+
           {!reviews.length ? (
-            <p className="text-muted-foreground text-center py-12">No reviews yet</p>
+            <p className="text-muted-foreground text-center py-8">No reviews submitted yet</p>
           ) : (
             reviews.map((review) => {
               const product = review.product as { name?: string } | undefined;
@@ -358,6 +501,9 @@ export default function AccountPage() {
                     <span className="text-gold">{"★".repeat(Number(review.rating))}</span>
                   </div>
                   {!!review.title && <p className="text-sm mt-1">{String(review.title)}</p>}
+                  {!!review.comment && (
+                    <p className="text-sm text-muted-foreground mt-1">{String(review.comment)}</p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-2">
                     {review.is_approved ? "Approved" : "Pending approval"}
                   </p>

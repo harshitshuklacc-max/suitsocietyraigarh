@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { getProductBySlug, getProducts } from "@/actions/products";
 import { getProductReviews } from "@/actions/auth";
+import { getUserSession } from "@/lib/auth";
 import { ProductDetail } from "@/components/shop/product-detail";
+import { ReviewSection } from "@/components/shop/review-section";
 import { ProductCard } from "@/components/shop/product-card";
 import type { Metadata } from "next";
 
@@ -29,11 +31,12 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [reviews, related] = await Promise.all([
+  const [reviews, related, session] = await Promise.all([
     getProductReviews(product.id),
     product.category_id
       ? getProducts({ category: product.category?.slug, limit: 4 })
       : Promise.resolve({ products: [], total: 0 }),
+    getUserSession(),
   ]);
 
   const relatedProducts = related.products.filter((p) => p.id !== product.id).slice(0, 4);
@@ -42,23 +45,12 @@ export default async function ProductPage({ params }: PageProps) {
     <div>
       <ProductDetail product={product} />
 
-      {reviews.length > 0 && (
-        <section className="container mx-auto px-4 py-12 border-t">
-          <h2 className="font-serif text-2xl tracking-wider mb-6">CUSTOMER REVIEWS</h2>
-          <div className="space-y-4 max-w-2xl">
-            {reviews.map((review) => (
-              <div key={review.id} className="border-b pb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-medium text-sm">{review.user?.full_name || "Customer"}</span>
-                  <span className="text-gold text-sm">{"★".repeat(review.rating)}</span>
-                </div>
-                {review.title && <p className="font-medium text-sm">{review.title}</p>}
-                {review.comment && <p className="text-sm text-muted-foreground">{review.comment}</p>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <ReviewSection
+        productId={product.id}
+        productName={product.name}
+        reviews={reviews}
+        isLoggedIn={!!session}
+      />
 
       {relatedProducts.length > 0 && (
         <section className="container mx-auto px-4 py-12">

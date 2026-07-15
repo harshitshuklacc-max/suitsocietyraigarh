@@ -14,6 +14,8 @@ import { FlashSaleSection } from "@/components/shop/flash-sale-section";
 
 import { HomepageVideos } from "@/components/shop/homepage-videos";
 
+import { CustomerReviewsSection } from "@/components/shop/customer-reviews-section";
+
 import { NewsletterForm } from "@/components/shop/newsletter-form";
 
 import { ArrowRight, Sparkles } from "lucide-react";
@@ -284,6 +286,14 @@ export default async function HomePage() {
 
         </section>
 
+      )}
+
+
+
+      {/* Customer Reviews */}
+
+      {homepage.reviews.length > 0 && (
+        <CustomerReviewsSection reviews={homepage.reviews} />
       )}
 
 

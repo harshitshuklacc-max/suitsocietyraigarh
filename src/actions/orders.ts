@@ -93,10 +93,20 @@ export async function createOrder(data: CheckoutData) {
 
   if (error) return { error: error.message };
 
+  const productIds = [...new Set(data.items.map((i) => i.productId))];
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, barcode, sku")
+    .in("id", productIds);
+  const codeByProduct = new Map(
+    (products || []).map((p) => [p.id, p.barcode || p.sku || null])
+  );
+
   const orderItems = data.items.map((item) => ({
     order_id: order.id,
     product_id: item.productId,
     product_name: item.name,
+    product_code: codeByProduct.get(item.productId) || null,
     product_image: item.image,
     color: item.color,
     size: item.size,

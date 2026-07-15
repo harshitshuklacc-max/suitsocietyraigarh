@@ -120,6 +120,7 @@ export interface OrderItem {
   order_id: string;
   product_id: string | null;
   product_name: string;
+  product_code?: string | null;
   product_image: string | null;
   color: string | null;
   size: string | null;
@@ -181,6 +182,7 @@ export interface Review {
   is_approved: boolean;
   created_at: string;
   user?: { full_name: string | null };
+  product?: { name?: string; slug?: string };
 }
 
 export interface Banner {

@@ -103,12 +103,12 @@ export function ProductDetail({ product }: Props) {
           <h1 className="font-serif text-3xl md:text-4xl tracking-wide">{product.name}</h1>
 
           {product.rating_count > 0 && (
-            <div className="flex items-center gap-2">
+            <a href="#reviews" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="flex">{Array.from({ length: 5 }).map((_, i) => (
                 <Star key={i} className={`w-4 h-4 ${i < Math.round(product.rating_avg) ? "fill-gold text-gold" : "text-muted"}`} />
               ))}</div>
               <span className="text-sm text-muted-foreground">({product.rating_count} reviews)</span>
-            </div>
+            </a>
           )}
 
           <div className="flex items-baseline gap-3 flex-wrap">

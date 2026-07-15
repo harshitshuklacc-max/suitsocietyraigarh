@@ -305,6 +305,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT NOT NULL,
+  product_code TEXT,
   product_image TEXT,
   color TEXT,
   size TEXT,
@@ -325,7 +326,8 @@ CREATE TABLE IF NOT EXISTS reviews (
   comment TEXT,
   is_approved BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(product_id, user_id)
 );
 
 -- Wishlist

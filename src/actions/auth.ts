@@ -107,6 +107,17 @@ export async function getProductReviews(productId: string) {
   return data || [];
 }
 
+export async function getRecentApprovedReviews(limit = 6) {
+  const supabase = await createServiceClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select("*, user:users(full_name), product:products(name, slug)")
+    .eq("is_approved", true)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return data || [];
+}
+
 export async function getPendingReviews() {
   const supabase = await createServiceClient();
   const { data } = await supabase

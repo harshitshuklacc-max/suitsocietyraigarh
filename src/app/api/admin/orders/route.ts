@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("orders")
-    .select("*, order_items(*), user:users(full_name, phone)")
+    .select("*, order_items(*, product:products(barcode, sku)), user:users(full_name, phone)")
     .order("created_at", { ascending: false });
 
   if (status) query = query.eq("status", status);

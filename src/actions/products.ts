@@ -167,7 +167,7 @@ export async function getHomepageData() {
   const supabase = await createClient();
 
   try {
-    const [heroes, banners, videos, happyCustomers, categories, flashSales, coupons] = await Promise.all([
+    const [heroes, banners, videos, happyCustomers, categories, flashSales, coupons, reviews] = await Promise.all([
       supabase.from("homepage_heroes").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("banners").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("homepage_videos").select("*, product:products(id, name, slug)").eq("is_active", true).order("sort_order"),
@@ -175,6 +175,7 @@ export async function getHomepageData() {
       supabase.from("categories").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("flash_sales").select("*").eq("is_active", true),
       supabase.from("coupons").select("*").eq("is_active", true),
+      supabase.from("reviews").select("*, user:users(full_name), product:products(name, slug)").eq("is_approved", true).order("created_at", { ascending: false }).limit(6),
     ]);
 
     const now = new Date().toISOString();
@@ -191,6 +192,7 @@ export async function getHomepageData() {
       categories: categories.data || [],
       flashSales: activeFlashSales,
       coupons: activeCoupons,
+      reviews: reviews.data || [],
     };
   } catch {
     return {
@@ -201,6 +203,7 @@ export async function getHomepageData() {
       categories: [],
       flashSales: [],
       coupons: [],
+      reviews: [],
     };
   }
 }

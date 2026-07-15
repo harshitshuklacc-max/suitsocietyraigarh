@@ -13,7 +13,7 @@ interface Review {
   is_approved: boolean;
   created_at: string;
   product?: { name?: string; slug?: string };
-  user?: { name?: string; phone?: string };
+  user?: { full_name?: string; phone?: string };
 }
 
 export default function AdminReviewsPage() {
@@ -55,6 +55,8 @@ export default function AdminReviewsPage() {
     if (res.ok) {
       toast.success("Review deleted");
       load();
+    } else {
+      toast.error("Failed to delete review");
     }
   };
 
@@ -107,7 +109,7 @@ export default function AdminReviewsPage() {
                   {review.title && <p className="text-white font-medium">{review.title}</p>}
                   {review.comment && <p className="text-zinc-400 text-sm mt-1">{review.comment}</p>}
                   <p className="text-zinc-500 text-xs mt-2">
-                    {review.product?.name} · {review.user?.name || review.user?.phone}
+                    {review.product?.name} · {review.user?.full_name || review.user?.phone}
                   </p>
                 </div>
                 <div className="flex gap-2">

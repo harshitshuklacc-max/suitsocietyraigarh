@@ -53,6 +53,15 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
+    const productIds = [...new Set(items.map((item: { productId: string }) => item.productId))];
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, barcode, sku")
+      .in("id", productIds);
+    const codeByProduct = new Map(
+      (products || []).map((p) => [p.id, p.barcode || p.sku || null])
+    );
+
     const orderItems = items.map((item: {
       productId: string;
       name: string;
@@ -66,6 +75,7 @@ export async function POST(request: Request) {
       order_id: order.id,
       product_id: item.productId,
       product_name: item.name,
+      product_code: codeByProduct.get(item.productId) || null,
       product_image: item.image,
       color: item.color,
       size: item.size,
