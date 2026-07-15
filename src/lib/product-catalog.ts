@@ -1,0 +1,131 @@
+import { slugify } from "@/lib/utils";
+
+/** Full category list from Suit Society spreadsheet dropdown */
+export const CATALOG_CATEGORIES = [
+  "Readymade 3-pc Suits",
+  "Korean Shirts/ Midis",
+  "Wedding/Festive collection",
+  "Co-Ord Sets",
+  "Winter Wear",
+  "Night Suits",
+] as const;
+
+/** Fabric types from the Suit Society product spreadsheet */
+export const CATALOG_FABRICS = [
+  "Cotton",
+  "Imported Fabric",
+  "Silk",
+  "Mul Cotton",
+  "Dola Silk",
+] as const;
+
+/** Colors used in the Suit Society product spreadsheet */
+export const CATALOG_COLORS = [
+  "Red",
+  "Green",
+  "Black",
+  "White",
+  "Pink",
+  "Golden",
+  "Ivory",
+  "Maroon",
+  "Blue",
+] as const;
+
+/** Common size labels from the spreadsheet */
+export const CATALOG_SIZES = [
+  "M (38)",
+  "L (40)",
+  "XL (42)",
+  "XXL (44)",
+] as const;
+
+export type ExcelProductRow = {
+  productCode: string;
+  name: string;
+  mrp: number;
+  discountPercent: number;
+  costPrice: number;
+  category: string;
+  color: string;
+  fabric: string;
+  size: string;
+  description: string;
+};
+
+function cell(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function numberCell(row: Record<string, unknown>, ...keys: string[]): number {
+  const raw = cell(row, ...keys);
+  if (!raw) return 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function parseExcelProductRow(row: Record<string, unknown>): ExcelProductRow | null {
+  const name = cell(row, "Product Name", "name", "Name", "PRODUCT");
+  if (!name) return null;
+
+  const discountRaw = numberCell(row, "Discount Percent", "discount_percent", "Discount");
+  const discountPercent = discountRaw > 1 ? discountRaw / 100 : discountRaw;
+
+  return {
+    productCode: cell(row, "Product Code", "product_code", "SKU", "sku"),
+    name,
+    mrp: numberCell(row, "MRP", "mrp", "compare_at_price"),
+    discountPercent,
+    costPrice: numberCell(row, "Cost Price", "cost_price", "cost"),
+    category: cell(row, "Category", "category"),
+    color: cell(row, "Color", "color", "colors"),
+    fabric: cell(row, "Fabric", "fabric"),
+    size: cell(row, "Size", "size", "sizes"),
+    description: cell(row, "Description", "description"),
+  };
+}
+
+export function parseSizeList(sizeText: string): string[] {
+  if (!sizeText) return [];
+  return sizeText
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function parseColorList(colorText: string): string[] {
+  if (!colorText) return [];
+  return colorText
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function calculateSellingPrice(mrp: number, discountPercent: number): number {
+  if (!mrp) return 0;
+  const discount = Math.min(Math.max(discountPercent, 0), 1);
+  return Math.round(mrp * (1 - discount) * 100) / 100;
+}
+
+export function uniqueSlug(base: string, suffix: string): string {
+  return `${slugify(base)}-${slugify(suffix || "item")}`;
+}
+
+export const EXCEL_COLUMN_GUIDE = [
+  "Product Code",
+  "Product Name",
+  "MRP",
+  "Discount Percent",
+  "Cost Price",
+  "Category",
+  "Color",
+  "Fabric",
+  "Size",
+  "Description",
+] as const;

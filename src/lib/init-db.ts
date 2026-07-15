@@ -1,0 +1,166 @@
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import postgres from "postgres";
+
+function getProjectRef(): string | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  const match = url.match(/https:\/\/([^.]+)\.supabase\.co/);
+  return match?.[1] ?? null;
+}
+
+function buildConnectionUrls(password: string): string[] {
+  const ref = getProjectRef();
+  if (!ref || !password) return [];
+
+  if (process.env.SUPABASE_DB_URL) {
+    return [process.env.SUPABASE_DB_URL];
+  }
+
+  const encoded = encodeURIComponent(password);
+  const regions = ["ap-south-1", "ap-southeast-1", "us-east-1", "eu-west-1", "eu-central-1"];
+  const prefixes = ["aws-0", "aws-1"];
+  const urls: string[] = [];
+
+  // Direct connection first — fastest when it works
+  urls.push(`postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres`);
+
+  for (const prefix of prefixes) {
+    for (const region of regions) {
+      urls.push(`postgresql://postgres.${ref}:${encoded}@${prefix}-${region}.pooler.supabase.com:5432/postgres`);
+      urls.push(`postgresql://postgres.${ref}:${encoded}@${prefix}-${region}.pooler.supabase.com:6543/postgres`);
+    }
+  }
+
+  return [...new Set(urls)];
+}
+
+function isIgnorableSqlError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("already exists") ||
+    lower.includes("duplicate key") ||
+    lower.includes("duplicate_object") ||
+    (lower.includes("policy") && lower.includes("already")) ||
+    lower.includes("multiple primary keys")
+  );
+}
+
+function splitSqlStatements(schema: string): string[] {
+  const statements: string[] = [];
+  let current = "";
+  let inDollarBlock = false;
+
+  for (let i = 0; i < schema.length; i++) {
+    const nextTwo = schema.slice(i, i + 2);
+
+    if (nextTwo === "$$") {
+      inDollarBlock = !inDollarBlock;
+      current += "$$";
+      i++;
+      continue;
+    }
+
+    if (schema[i] === ";" && !inDollarBlock) {
+      const trimmed = current.trim();
+      if (trimmed && !trimmed.startsWith("--")) {
+        statements.push(trimmed);
+      }
+      current = "";
+      continue;
+    }
+
+    current += schema[i];
+  }
+
+  const last = current.trim();
+  if (last && !last.startsWith("--")) statements.push(last);
+
+  return statements;
+}
+
+async function runSchema(sql: postgres.Sql, schema: string): Promise<void> {
+  const statements = splitSqlStatements(schema);
+  let executed = 0;
+
+  for (const statement of statements) {
+    try {
+      await sql.unsafe(statement);
+      executed++;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isIgnorableSqlError(message)) {
+        throw error;
+      }
+    }
+  }
+
+  if (executed === 0) {
+    await sql.unsafe(schema);
+  }
+}
+
+async function tryRunSchema(connectionString: string, schema: string): Promise<{ ok: boolean; error?: string }> {
+  const usePooler = connectionString.includes(":6543");
+  const sql = postgres(connectionString, {
+    ssl: "require",
+    max: 1,
+    connect_timeout: 10,
+    idle_timeout: 10,
+    prepare: !usePooler,
+  });
+
+  try {
+    await runSchema(sql, schema);
+    await sql.end({ timeout: 5 });
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Database initialization failed";
+    await sql.end({ timeout: 5 }).catch(() => undefined);
+    if (isIgnorableSqlError(message)) {
+      return { ok: true };
+    }
+    return { ok: false, error: message };
+  }
+}
+
+export async function initializeDatabase(dbPassword?: string): Promise<{ success: boolean; error?: string }> {
+  const password = dbPassword || process.env.SUPABASE_DB_PASSWORD;
+  if (!password) {
+    return {
+      success: false,
+      error: "Database password required. Supabase Dashboard → Settings → Database → Database password.",
+    };
+  }
+
+  const urls = buildConnectionUrls(password);
+  if (!urls.length) {
+    return { success: false, error: "Could not build database connection URL." };
+  }
+
+  const bootstrapPath = join(process.cwd(), "supabase", "bootstrap.sql");
+  const schemaPath = join(process.cwd(), "supabase", "schema.sql");
+  const bootstrap = existsSync(bootstrapPath) ? readFileSync(bootstrapPath, "utf8") : "";
+  const schema = readFileSync(schemaPath, "utf8");
+
+  let lastError = "Could not connect to database. Check your Supabase database password.";
+
+  for (const connectionString of urls) {
+    if (bootstrap) {
+      const boot = await tryRunSchema(connectionString, bootstrap);
+      if (boot.ok) {
+        const full = await tryRunSchema(connectionString, schema);
+        if (full.ok) return { success: true };
+        return { success: true, error: "Bootstrap OK. Some full-schema steps may need manual SQL Editor run." };
+      }
+      lastError = boot.error || lastError;
+      continue;
+    }
+
+    const result = await tryRunSchema(connectionString, schema);
+    if (result.ok) return { success: true };
+    lastError = result.error || lastError;
+  }
+
+  return { success: false, error: lastError };
+}
