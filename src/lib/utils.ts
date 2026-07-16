@@ -98,6 +98,7 @@ export const SITE_CONFIG = {
   name: "Suit Society",
   email: "suitsocietyofficial@gmail.com",
   phone: "07974100362",
+  whatsapp: "917974100362",
   address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk Channel, Raigarh, Chhattisgarh - 496001",
   defaultAdmin: {
     username: "SUiTsOcIety",

@@ -18,6 +18,8 @@ import { CustomerReviewsSection } from "@/components/shop/customer-reviews-secti
 
 import { NewsletterForm } from "@/components/shop/newsletter-form";
 
+import { WhatsAppFloat } from "@/components/shop/whatsapp-float";
+
 import { ArrowRight, Sparkles } from "lucide-react";
 
 
@@ -313,6 +315,8 @@ export default async function HomePage() {
         </div>
 
       </section>
+
+      <WhatsAppFloat />
 
     </div>
 
