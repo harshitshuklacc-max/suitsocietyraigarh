@@ -59,7 +59,10 @@ export function Footer() {
         </div>
 
         <div className="border-t border-white/10 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/50">
-          <p>&copy; {new Date().getFullYear()} Suit Society. All rights reserved.</p>
+          <div className="text-center sm:text-left">
+            <p>&copy; {new Date().getFullYear()} Suit Society. All rights reserved.</p>
+            <p className="mt-1">Made by HKS Web Development Company — 9406112110</p>
+          </div>
           <Link
             href="/admin/login"
             className="inline-flex items-center gap-2 text-white/60 hover:text-gold transition-colors"

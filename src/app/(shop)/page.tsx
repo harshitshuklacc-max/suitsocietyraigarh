@@ -70,65 +70,36 @@ export default async function HomePage() {
 
 
 
-      {/* All Products — shown directly like labelamrita / shreeshivam */}
+      {/* Watch & Shop — videos first */}
+      <HomepageVideos videos={homepage.videos} />
 
+      {/* Shop Collection — products */}
       <section className="container mx-auto px-4">
-
         <div className="flex items-center justify-between mb-6 md:mb-8">
-
           <div>
-
             <h2 className="font-serif text-2xl md:text-4xl tracking-wider">SHOP COLLECTION</h2>
-
             <p className="text-muted-foreground text-sm mt-1">
-
               {products.length > 0 ? `${products.length}+ premium styles` : "New arrivals coming soon"}
-
             </p>
-
           </div>
-
           <Link href="/products" className="text-sm tracking-wider hover:text-gold flex items-center gap-1 shrink-0">
-
             View All <ArrowRight className="w-4 h-4" />
-
           </Link>
-
         </div>
 
-
-
         {products.length > 0 ? (
-
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
-
             {products.map((p) => (
-
               <ProductCard key={p.id} product={p} showBadge={p.is_new_arrival ? "new" : p.is_trending ? "trending" : null} />
-
             ))}
-
           </div>
-
         ) : (
-
           <div className="text-center py-20 bg-muted/30 rounded-xl">
-
             <p className="text-muted-foreground mb-4">Products will appear here once added from admin panel.</p>
-
             <Link href="/admin/login"><Button variant="luxury">Admin Panel</Button></Link>
-
           </div>
-
         )}
-
       </section>
-
-
-
-      {/* Homepage Videos — autoplay */}
-
-      <HomepageVideos videos={homepage.videos} />
 
 
 

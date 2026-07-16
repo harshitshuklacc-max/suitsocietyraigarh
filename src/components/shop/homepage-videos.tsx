@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import type { HomepageVideo } from "@/types";
 
 interface HomepageVideosProps {
@@ -30,8 +31,15 @@ export function HomepageVideos({ videos }: HomepageVideosProps) {
 
 function VideoCard({ video }: { video: HomepageVideo }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const el = videoRef.current;
     if (!el) return;
 
@@ -51,21 +59,34 @@ function VideoCard({ video }: { video: HomepageVideo }) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [mounted]);
 
   const content = (
     <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-black shadow-lg ring-1 ring-black/5">
-      <video
-        ref={videoRef}
-        src={video.video_url}
-        poster={video.thumbnail_url || undefined}
-        muted
-        loop
-        playsInline
-        autoPlay
-        preload="auto"
-        className="w-full h-full object-cover"
-      />
+      {mounted ? (
+        <video
+          ref={videoRef}
+          src={video.video_url}
+          poster={video.thumbnail_url || undefined}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="auto"
+          className="w-full h-full object-cover"
+          suppressHydrationWarning
+        />
+      ) : video.thumbnail_url ? (
+        <Image
+          src={video.thumbnail_url}
+          alt={video.title || "Suit Society video"}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 42vw, 22vw"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-black" />
+      )}
       {video.title && (
         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
           <p className="text-white text-xs md:text-sm font-medium line-clamp-2">{video.title}</p>

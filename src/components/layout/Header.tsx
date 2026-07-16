@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingBag, Heart, User, Menu, X, Phone } from "lucide-react";
@@ -32,8 +33,16 @@ export function Header({ categories = [] }: HeaderProps) {
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
 
-          <Link href="/" className="font-serif text-2xl md:text-3xl tracking-widest text-luxury-black">
-            SUIT <span className="text-gold">SOCIETY</span>
+          <Link href="/" className="flex items-center">
+            <div className="relative h-10 md:h-12 w-[120px]">
+              <Image
+                src="/logo.jpeg"
+                alt="Suit Society"
+                fill
+                className="object-contain object-left"
+                priority
+              />
+            </div>
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
