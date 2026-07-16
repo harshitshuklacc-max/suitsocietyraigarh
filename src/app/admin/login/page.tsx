@@ -19,8 +19,8 @@ export default function AdminLoginPage() {
   const [showDbSetup, setShowDbSetup] = useState(true);
   const [dbPassword, setDbPassword] = useState("");
   const [form, setForm] = useState<{ username: string; password: string }>({
-    username: DEFAULT_ADMIN.username,
-    password: DEFAULT_ADMIN.password,
+    username: "",
+    password: "",
   });
 
   const projectRef =
@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
       setDbReady(true);
       setShowDbSetup(false);
 
-      const result = await loginAdmin(form.username, form.password);
+      const result = await loginAdmin(DEFAULT_ADMIN.username, DEFAULT_ADMIN.password);
       if (result.success) {
         router.push("/admin");
       }
@@ -167,11 +167,12 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <div>
               <Label>Username</Label>
               <Input
                 required
+                autoComplete="off"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
               />
@@ -181,6 +182,7 @@ export default function AdminLoginPage() {
               <Input
                 required
                 type="password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
