@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -66,6 +66,14 @@ interface Order {
 
   shipping_phone?: string;
 
+  shipping_address?: string;
+
+  shipping_city?: string;
+
+  shipping_state?: string;
+
+  shipping_pincode?: string;
+
   created_at: string;
 
   order_items?: OrderItem[];
@@ -79,6 +87,38 @@ interface Order {
 function getProductCode(item: OrderItem) {
 
   return item.product_code || item.product?.barcode || item.product?.sku || "-";
+
+}
+
+
+
+function formatShippingLocation(order: Order) {
+
+  const parts = [
+
+    order.shipping_address,
+
+    order.shipping_city,
+
+    order.shipping_state,
+
+    order.shipping_pincode,
+
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(", ") : null;
+
+}
+
+
+
+function getMapsUrl(order: Order) {
+
+  const location = formatShippingLocation(order);
+
+  if (!location) return null;
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 
 }
 
@@ -208,6 +248,10 @@ export default function AdminOrdersPage() {
 
               const items = order.order_items || [];
 
+              const shippingLocation = formatShippingLocation(order);
+
+              const mapsUrl = getMapsUrl(order);
+
 
 
               return (
@@ -251,6 +295,42 @@ export default function AdminOrdersPage() {
                         {items.length} item{items.length !== 1 ? "s" : ""}
 
                       </p>
+
+                      {shippingLocation && (
+
+                        <div className="mt-2 flex items-start gap-1.5 text-sm text-zinc-400">
+
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400/80" />
+
+                          <div>
+
+                            <p>{shippingLocation}</p>
+
+                            {mapsUrl && (
+
+                              <a
+
+                                href={mapsUrl}
+
+                                target="_blank"
+
+                                rel="noopener noreferrer"
+
+                                className="text-xs text-amber-400/90 hover:text-amber-300 mt-0.5 inline-block"
+
+                              >
+
+                                View on Google Maps
+
+                              </a>
+
+                            )}
+
+                          </div>
+
+                        </div>
+
+                      )}
 
                     </div>
 
