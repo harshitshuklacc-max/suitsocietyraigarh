@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MAX_VIDEO_SIZE_LABEL, validateVideoFileSize } from "@/lib/upload-limits";
+import { uploadAdminVideo } from "@/lib/admin-video-upload";
 import {
   AdminHeader,
   AdminCard,
@@ -122,13 +123,8 @@ export function AdminVideosManager() {
     }
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("bucket", "videos");
-      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Upload failed");
-      setForm({ ...form, video_url: json.url });
+      const publicUrl = await uploadAdminVideo(file);
+      setForm({ ...form, video_url: publicUrl });
       toast.success("Video uploaded");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");

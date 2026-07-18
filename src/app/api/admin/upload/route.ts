@@ -15,6 +15,13 @@ export async function POST(request: Request) {
       return Response.json({ error: "No file provided" }, { status: 400 });
     }
 
+    if (file.size === 0) {
+      return Response.json(
+        { error: "Upload failed. The file may have exceeded the server upload limit. Please try again." },
+        { status: 400 }
+      );
+    }
+
     const isVideoUpload = bucket === "videos" || file.type.startsWith("video/");
     if (isVideoUpload) {
       const sizeError = validateVideoFileSize(file.size);

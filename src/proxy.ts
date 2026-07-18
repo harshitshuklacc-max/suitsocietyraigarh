@@ -4,11 +4,11 @@ import { updateSession } from "@/lib/supabase/middleware";
 const PUBLIC_PATHS = ["/setup", "/api/setup", "/api/setup/init-db", "/api/health"];
 const ADMIN_PUBLIC_PATHS = ["/admin/login"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check setup status
-  const isSetup = process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  const isSetup =
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
     process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -23,7 +23,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Checkout requires customer login
   if (pathname.startsWith("/checkout")) {
     const userSession = request.cookies.get("user_token");
     if (!userSession?.value) {
@@ -33,7 +32,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Admin route protection
   if (pathname.startsWith("/admin") && !ADMIN_PUBLIC_PATHS.includes(pathname)) {
     const adminSession = request.cookies.get("ss_admin_session") ?? request.cookies.get("admin_token");
     if (!adminSession?.value) {
