@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { MAX_VIDEO_SIZE_LABEL, validateVideoFileSize } from "@/lib/upload-limits";
 import {
   AdminHeader,
   AdminCard,
@@ -111,6 +112,12 @@ export function AdminVideosManager() {
     if (!file) return;
     if (!file.type.startsWith("video/")) {
       toast.error("Please upload a video file (mp4, webm)");
+      return;
+    }
+    const sizeError = validateVideoFileSize(file.size);
+    if (sizeError) {
+      toast.error(sizeError);
+      e.target.value = "";
       return;
     }
     setUploading(true);
@@ -231,6 +238,7 @@ export function AdminVideosManager() {
                 disabled={uploading}
                 className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500 file:text-zinc-950"
               />
+              <p className="text-xs text-zinc-500 mt-1">Maximum file size: {MAX_VIDEO_SIZE_LABEL}</p>
               {uploading && <p className="text-xs text-zinc-500 mt-1">Uploading...</p>}
             </div>
             <div>

@@ -1,5 +1,6 @@
 ﻿import { requireAdmin, unauthorized } from "@/lib/admin-crud";
 import { createServiceClient } from "@/lib/supabase/server";
+import { validateVideoFileSize } from "@/lib/upload-limits";
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
@@ -12,6 +13,14 @@ export async function POST(request: Request) {
 
     if (!file) {
       return Response.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    const isVideoUpload = bucket === "videos" || file.type.startsWith("video/");
+    if (isVideoUpload) {
+      const sizeError = validateVideoFileSize(file.size);
+      if (sizeError) {
+        return Response.json({ error: sizeError }, { status: 400 });
+      }
     }
 
     const supabase = createServiceClient();

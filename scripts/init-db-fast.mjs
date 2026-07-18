@@ -111,11 +111,20 @@ async function main() {
     console.log("OK: admin exists");
   }
 
+  const MAX_VIDEO_SIZE_BYTES = 11 * 1024 * 1024;
+  const bucketLimits = {
+    products: 52428800,
+    banners: 52428800,
+    videos: MAX_VIDEO_SIZE_BYTES,
+  };
+
   for (const bucket of ["products", "banners", "videos"]) {
     const { data } = await supabase.storage.getBucket(bucket);
     if (!data) {
-      await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 });
+      await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: bucketLimits[bucket] });
       console.log("OK: bucket", bucket);
+    } else {
+      await supabase.storage.updateBucket(bucket, { public: true, fileSizeLimit: bucketLimits[bucket] });
     }
   }
 

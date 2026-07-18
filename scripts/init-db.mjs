@@ -154,13 +154,21 @@ async function main() {
     console.log("✓ Admin user already exists");
   }
 
+  const MAX_VIDEO_SIZE_BYTES = 11 * 1024 * 1024;
+  const bucketLimits = {
+    products: 52428800,
+    banners: 52428800,
+    videos: MAX_VIDEO_SIZE_BYTES,
+  };
+
   for (const bucket of ["products", "banners", "videos"]) {
     const { data } = await supabase.storage.getBucket(bucket);
     if (!data) {
-      await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: 52428800 });
+      await supabase.storage.createBucket(bucket, { public: true, fileSizeLimit: bucketLimits[bucket] });
       console.log(`✓ Bucket created: ${bucket}`);
     } else {
-      console.log(`✓ Bucket exists: ${bucket}`);
+      await supabase.storage.updateBucket(bucket, { public: true, fileSizeLimit: bucketLimits[bucket] });
+      console.log(`✓ Bucket updated: ${bucket}`);
     }
   }
 
