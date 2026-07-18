@@ -21,7 +21,9 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const supabase = createServiceClient();
-  const { data, error } = await supabase.from("banners").insert(body).select().single();
+  const row = { ...body };
+  if (!row.title) row.title = "Banner";
+  const { data, error } = await supabase.from("banners").insert(row).select().single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ data });

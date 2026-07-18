@@ -13,9 +13,8 @@ export default function AdminHeroPage() {
         fields={[
           { key: "title", label: "Title" },
           { key: "subtitle", label: "Subtitle" },
-          { key: "description", label: "Description", type: "textarea" },
-          { key: "image_url", label: "Desktop Image URL", type: "url", required: true },
-          { key: "mobile_image_url", label: "Mobile Image URL", type: "url" },
+          { key: "image_url", label: "Desktop Image", type: "image", bucket: "banners", required: true },
+          { key: "mobile_image_url", label: "Mobile Image", type: "image", bucket: "banners" },
           { key: "link_url", label: "Link URL", type: "url" },
           { key: "button_text", label: "Button Text", defaultValue: "Shop Now" },
           { key: "sort_order", label: "Sort Order", type: "number", defaultValue: 0 },

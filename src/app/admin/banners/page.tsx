@@ -13,7 +13,7 @@ export default function AdminBannersPage() {
         fields={[
           { key: "title", label: "Title" },
           { key: "subtitle", label: "Subtitle" },
-          { key: "image_url", label: "Image URL", type: "url", required: true },
+          { key: "image_url", label: "Banner Image", type: "image", bucket: "banners", required: true },
           { key: "link_url", label: "Link URL", type: "url" },
           { key: "sort_order", label: "Sort Order", type: "number", defaultValue: 0 },
           { key: "is_active", label: "Active", type: "checkbox", defaultValue: true },

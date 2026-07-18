@@ -12,7 +12,7 @@ export default function AdminHappyCustomersPage() {
         apiPath="/api/admin/happy-customers"
         fields={[
           { key: "customer_name", label: "Customer Name" },
-          { key: "image_url", label: "Image URL", type: "url", required: true },
+          { key: "image_url", label: "Photo", type: "image", bucket: "banners", required: true },
           { key: "caption", label: "Caption", type: "textarea" },
           { key: "sort_order", label: "Sort Order", type: "number", defaultValue: 0 },
           { key: "is_active", label: "Active", type: "checkbox", defaultValue: true },

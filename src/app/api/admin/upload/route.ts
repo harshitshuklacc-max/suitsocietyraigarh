@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       if (sizeError) {
         return Response.json({ error: sizeError }, { status: 400 });
       }
+    } else if ((bucket === "banners" || bucket === "images") && !file.type.startsWith("image/")) {
+      return Response.json({ error: "Please upload an image file (JPG, PNG, WebP, or GIF)" }, { status: 400 });
     }
 
     const supabase = createServiceClient();

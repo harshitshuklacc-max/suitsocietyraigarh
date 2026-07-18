@@ -10,6 +10,7 @@
     "seed:products": "node scripts/seed-products.mjs",
     "seed:catalog": "node scripts/seed-catalog.mjs",
     "fix:db": "node scripts/fix-db-and-barcodes.mjs",
+    "fix:heroes": "node scripts/ensure-homepage-heroes.mjs",
     "backfill:barcodes": "node scripts/backfill-barcodes.mjs",
     "clear:products": "node scripts/clear-products.mjs"
   },

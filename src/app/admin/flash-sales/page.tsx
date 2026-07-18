@@ -12,7 +12,7 @@ export default function AdminFlashSalesPage() {
         apiPath="/api/admin/flash-sales"
         fields={[
           { key: "title", label: "Sale Title", required: true },
-          { key: "banner_url", label: "Banner URL", type: "url" },
+          { key: "banner_url", label: "Banner Image", type: "image", bucket: "banners" },
           { key: "discount_percentage", label: "Discount %", type: "number", required: true },
           { key: "starts_at", label: "Start Date & Time", type: "datetime-local", required: true },
           { key: "ends_at", label: "End Date & Time", type: "datetime-local", required: true },

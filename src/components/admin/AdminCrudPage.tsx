@@ -11,15 +11,17 @@ import {
   AdminSelect,
   AdminTextarea,
 } from "./AdminLayout";
+import { ImageUploadInput } from "./image-upload-input";
 
 export interface FieldConfig {
   key: string;
   label: string;
-  type?: "text" | "number" | "url" | "textarea" | "checkbox" | "select" | "datetime-local";
+  type?: "text" | "number" | "url" | "textarea" | "checkbox" | "select" | "datetime-local" | "image";
   required?: boolean;
   options?: { value: string; label: string }[];
   placeholder?: string;
   defaultValue?: string | number | boolean;
+  bucket?: string;
 }
 
 interface AdminCrudPageProps {
@@ -165,6 +167,13 @@ export function AdminCrudPage({
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </AdminSelect>
+                ) : field.type === "image" ? (
+                  <ImageUploadInput
+                    value={String(form[field.key] ?? "")}
+                    onChange={(url) => setForm({ ...form, [field.key]: url })}
+                    bucket={field.bucket || "banners"}
+                    label={field.label}
+                  />
                 ) : (
                   <AdminInput
                     type={field.type || "text"}

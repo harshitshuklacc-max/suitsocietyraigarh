@@ -21,7 +21,7 @@ const navItems = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/heroes", label: "Hero Slides", icon: Image },
+  { href: "/admin/hero", label: "Hero Slides", icon: Image },
   { href: "/admin/banners", label: "Banners", icon: Sparkles },
   { href: "/admin/videos", label: "Videos", icon: Video },
   { href: "/admin/happy-customers", label: "Happy Customers", icon: Heart },

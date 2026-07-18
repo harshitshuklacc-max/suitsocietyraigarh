@@ -310,16 +310,15 @@ CREATE TABLE IF NOT EXISTS banners (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Hero slides
-CREATE TABLE IF NOT EXISTS hero_slides (
+-- Homepage hero slides
+CREATE TABLE IF NOT EXISTS homepage_heroes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title TEXT,
   subtitle TEXT,
-  description TEXT,
   image_url TEXT NOT NULL,
   mobile_image_url TEXT,
   link_url TEXT,
-  button_text TEXT,
+  button_text TEXT DEFAULT 'Shop Now',
   sort_order INT DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
