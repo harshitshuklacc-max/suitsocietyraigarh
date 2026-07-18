@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AdminLayout,
@@ -11,6 +11,7 @@ import {
   AdminInput,
 } from "@/components/admin/AdminLayout";
 import { BRAND, DEFAULT_ADMIN } from "@/lib/constants";
+import { CATALOG_SIZES } from "@/lib/product-catalog";
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,9 @@ export default function AdminSettingsPage() {
   const [savingSizeChart, setSavingSizeChart] = useState(false);
   const [uploadingSizeChart, setUploadingSizeChart] = useState(false);
   const [sizeChartUrl, setSizeChartUrl] = useState("/size-chart.svg");
+  const [catalogSizes, setCatalogSizes] = useState<string[]>([]);
+  const [newSize, setNewSize] = useState("");
+  const [savingSizes, setSavingSizes] = useState(false);
   const [admin, setAdmin] = useState<{ username: string; must_change_credentials?: boolean } | null>(null);
   const [form, setForm] = useState({
     username: "",
@@ -34,6 +38,12 @@ export default function AdminSettingsPage() {
         setForm((f) => ({ ...f, username: d.admin?.username || "" }));
         const sizeChartSetting = (d.settings || []).find((item: { key: string }) => item.key === "size_chart");
         if (sizeChartSetting?.value?.url) setSizeChartUrl(sizeChartSetting.value.url);
+        const sizesSetting = (d.settings || []).find((item: { key: string }) => item.key === "catalog_sizes");
+        if (sizesSetting?.value?.sizes?.length) {
+          setCatalogSizes(sizesSetting.value.sizes);
+        } else {
+          setCatalogSizes([...CATALOG_SIZES]);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -106,6 +116,43 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const saveCatalogSizes = async (sizes: string[]) => {
+    setSavingSizes(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ catalogSizes: sizes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCatalogSizes(sizes);
+      toast.success("Sizes updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setSavingSizes(false);
+    }
+  };
+
+  const handleAddSize = async () => {
+    const trimmed = newSize.trim();
+    if (!trimmed) {
+      toast.error("Enter a size label");
+      return;
+    }
+    if (catalogSizes.some((size) => size.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("This size already exists");
+      return;
+    }
+    await saveCatalogSizes([...catalogSizes, trimmed]);
+    setNewSize("");
+  };
+
+  const handleRemoveSize = async (size: string) => {
+    await saveCatalogSizes(catalogSizes.filter((item) => item !== size));
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -167,6 +214,56 @@ export default function AdminSettingsPage() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
             </AdminButton>
           </form>
+        </AdminCard>
+
+        <AdminCard>
+          <h3 className="text-white font-medium mb-4">Product Sizes</h3>
+          <p className="text-sm text-zinc-400 mb-4">
+            Add custom size labels for products, e.g. 3XL (44). These appear when adding or editing products.
+          </p>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <AdminInput
+                value={newSize}
+                onChange={(e) => setNewSize(e.target.value)}
+                placeholder="e.g. 3XL (44)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddSize();
+                  }
+                }}
+              />
+              <AdminButton type="button" onClick={handleAddSize} disabled={savingSizes}>
+                {savingSizes ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              </AdminButton>
+            </div>
+            {catalogSizes.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {catalogSizes.map((size) => (
+                  <span
+                    key={size}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-zinc-800 text-sm text-zinc-200"
+                  >
+                    {size}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSize(size)}
+                      disabled={savingSizes}
+                      className="text-zinc-500 hover:text-red-400"
+                      aria-label={`Remove ${size}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500">
+                No custom sizes yet. Default sizes from the catalog are used until you add one here.
+              </p>
+            )}
+          </div>
         </AdminCard>
 
         <AdminCard>

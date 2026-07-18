@@ -72,5 +72,22 @@ export async function PUT(request: Request) {
     }
   }
 
+  if (body.catalogSizes !== undefined) {
+    const sizes = Array.isArray(body.catalogSizes)
+      ? body.catalogSizes.map((size: unknown) => String(size).trim()).filter(Boolean)
+      : [];
+    const { error } = await supabase.from("settings").upsert(
+      {
+        key: "catalog_sizes",
+        value: { sizes },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" }
+    );
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+  }
+
   return Response.json({ success: true });
 }

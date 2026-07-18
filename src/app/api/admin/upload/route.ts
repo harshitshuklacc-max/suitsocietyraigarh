@@ -1,4 +1,5 @@
-﻿import { requireAdmin, unauthorized } from "@/lib/admin-crud";
+import { requireAdmin, unauthorized } from "@/lib/admin-crud";
+import { ensureStorageBucket } from "@/lib/storage-setup";
 import { createServiceClient } from "@/lib/supabase/server";
 import { validateVideoFileSize } from "@/lib/upload-limits";
 
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = createServiceClient();
+    await ensureStorageBucket(bucket);
     const ext = file.name.split(".").pop() || "mp4";
     const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -47,9 +49,17 @@ export async function POST(request: Request) {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return Response.json({ url: data.publicUrl });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Upload failed" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Upload failed";
+    if (/entity too large|body exceeded|413/i.test(message)) {
+      return Response.json(
+        {
+          error:
+            "Upload too large. Videos must be 11 MB or smaller. Use Admin → Videos upload (direct to storage). Restart dev server after updates.",
+        },
+        { status: 413 }
+      );
+    }
+
+    return Response.json({ error: message }, { status: 500 });
   }
 }

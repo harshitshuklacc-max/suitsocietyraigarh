@@ -33,6 +33,7 @@ interface Props {
   categories: { id: string; name: string }[];
   fabrics: { id: string; name: string }[];
   product?: AdminProduct | null;
+  availableSizes?: string[];
 }
 
 function getInitialPrices(product?: AdminProduct | null) {
@@ -41,7 +42,7 @@ function getInitialPrices(product?: AdminProduct | null) {
   return { mrp, sellingPrice };
 }
 
-export function ProductForm({ categories, fabrics, product }: Props) {
+export function ProductForm({ categories, fabrics, product, availableSizes }: Props) {
   const router = useRouter();
   const isEdit = Boolean(product);
   const initialPrices = getInitialPrices(product);
@@ -71,6 +72,9 @@ export function ProductForm({ categories, fabrics, product }: Props) {
     mrpValue > sellingPriceValue
       ? calculateDiscountPercentage(mrpValue, sellingPriceValue)
       : 0;
+
+  const sizeOptions = availableSizes?.length ? availableSizes : [...CATALOG_SIZES];
+  const displaySizes = [...new Set([...sizeOptions, ...form.sizes])];
 
   const barcodePreview =
     product?.barcode || barcodeFromProductCode(form.product_code) || "";
@@ -305,7 +309,7 @@ export function ProductForm({ categories, fabrics, product }: Props) {
           <div>
             <Label className="mb-2 block">Size</Label>
             <div className="flex flex-wrap gap-2">
-              {CATALOG_SIZES.map((size) => (
+              {displaySizes.map((size) => (
                 <button
                   key={size}
                   type="button"

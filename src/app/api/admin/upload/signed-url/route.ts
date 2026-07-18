@@ -1,4 +1,5 @@
 import { requireAdmin, unauthorized } from "@/lib/admin-crud";
+import { ensureStorageBucket } from "@/lib/storage-setup";
 import { createServiceClient } from "@/lib/supabase/server";
 import { validateVideoFileSize } from "@/lib/upload-limits";
 
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const supabase = createServiceClient();
+    await ensureStorageBucket(bucket);
     const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(path);
 
     if (error || !data) {

@@ -383,6 +383,9 @@ export async function createProduct(formData: FormData) {
     if (imageResult.error) return { error: imageResult.error };
   }
 
+  const videoResult = await syncProductVideos(data.id, formData);
+  if (videoResult.error) return { error: videoResult.error };
+
   if (payload.stock > 0) {
     await supabase.from("inventory").insert({
       product_id: data.id,
@@ -412,6 +415,9 @@ export async function updateProduct(id: string, formData: FormData) {
     const imageResult = await saveProductImage(id, imageFile);
     if (imageResult.error) return { error: imageResult.error };
   }
+
+  const videoResult = await syncProductVideos(id, formData);
+  if (videoResult.error) return { error: videoResult.error };
 
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
@@ -448,7 +454,7 @@ export async function getProductByIdAdmin(id: string) {
   const supabase = await createServiceClient();
   const { data } = await supabase
     .from("products")
-    .select("*, images:product_images(*), category:categories(id, name), fabric:fabrics(id, name)")
+    .select("*, images:product_images(*), videos:product_videos(*), category:categories(id, name), fabric:fabrics(id, name)")
     .eq("id", id)
     .single();
   return data;
