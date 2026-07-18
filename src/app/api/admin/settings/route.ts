@@ -58,5 +58,19 @@ export async function PUT(request: Request) {
     await supabase.from("admin_users").update(updates).eq("id", session.id);
   }
 
+  if (body.sizeChartUrl !== undefined) {
+    const { error } = await supabase.from("settings").upsert(
+      {
+        key: "size_chart",
+        value: { url: body.sizeChartUrl },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" }
+    );
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+  }
+
   return Response.json({ success: true });
 }

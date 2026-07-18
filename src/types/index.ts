@@ -295,11 +295,13 @@ export interface SiteSettings {
 }
 
 export interface ProductFilters {
-  category?: string;
-  brand?: string;
-  fabric?: string;
-  color?: string;
-  size?: string;
+  category?: string | string[];
+  brand?: string | string[];
+  fabric?: string | string[];
+  color?: string | string[];
+  size?: string | string[];
+  priceRange?: string | string[];
+  availability?: string | string[];
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;

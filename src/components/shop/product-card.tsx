@@ -10,6 +10,9 @@ import { getPrimaryImageUrl } from "@/lib/product-images";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/providers/cart-provider";
+import { useWishlist } from "@/context/WishlistContext";
+import { cn } from "@/lib/utils";
+import { sortSizes } from "@/lib/product-utils";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -19,6 +22,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, showBadge }: ProductCardProps) {
   const { addItem } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const image = getPrimaryImageUrl(product.images);
   const mrp = product.compare_at_price ?? product.price;
   const sellingPrice = product.effective_price ?? product.price;
@@ -37,7 +41,7 @@ export function ProductCard({ product, showBadge }: ProductCardProps) {
       price: sellingPrice,
       compareAtPrice: hasDiscount ? mrp : undefined,
       color: product.colors[0],
-      size: product.sizes[0],
+      size: sortSizes(product.sizes)[0],
       quantity: 1,
       stock: product.stock,
     });
@@ -75,8 +79,21 @@ export function ProductCard({ product, showBadge }: ProductCardProps) {
             </Button>
           </div>
 
-          <button className="absolute top-3 right-3 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white">
-            <Heart className="w-4 h-4" />
+          <button
+            className={cn(
+              "absolute top-3 right-3 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white",
+              isInWishlist(product.id) && "opacity-100 bg-red-50 text-red-500"
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const wasInWishlist = isInWishlist(product.id);
+              toggleWishlist(product.id);
+              toast.success(wasInWishlist ? "Removed from wishlist" : "Added to wishlist");
+            }}
+            aria-label="Toggle wishlist"
+          >
+            <Heart className={cn("w-4 h-4", isInWishlist(product.id) && "fill-current")} />
           </button>
         </div>
 

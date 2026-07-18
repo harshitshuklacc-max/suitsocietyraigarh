@@ -61,7 +61,7 @@ export async function getWishlist() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
   const { data } = await supabase
-    .from("wishlist")
+    .from("wishlists")
     .select("*, product:products(*, images:product_images(*))")
     .eq("user_id", user.id);
   return data || [];
@@ -73,17 +73,20 @@ export async function toggleWishlist(productId: string) {
   if (!user) return { error: "Please login first" };
 
   const { data: existing } = await supabase
-    .from("wishlist")
+    .from("wishlists")
     .select("id")
     .eq("user_id", user.id)
     .eq("product_id", productId)
     .maybeSingle();
 
   if (existing) {
-    await supabase.from("wishlist").delete().eq("id", existing.id);
+    await supabase.from("wishlists").delete().eq("id", existing.id);
     return { success: true, added: false };
   }
-  await supabase.from("wishlist").insert({ user_id: user.id, product_id: productId });
+  await supabase.from("wishlists").upsert(
+    { user_id: user.id, product_id: productId },
+    { onConflict: "user_id,product_id" }
+  );
   return { success: true, added: true };
 }
 

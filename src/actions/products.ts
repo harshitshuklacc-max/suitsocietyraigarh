@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { Product, ProductFilters, Category, Brand, Fabric, FlashSale, Coupon, ProductDiscount } from "@/types";
 import { slugify, getEffectivePrice, isDateInRange, calculateDiscountPercentage } from "@/lib/utils";
 import { resolveProductBarcode } from "@/lib/barcode";
+import { parseFilterList, PRICE_RANGES, mergeUniqueColors, FILTER_COLORS, sortSizes } from "@/lib/product-utils";
 import { revalidatePath } from "next/cache";
 
 export async function getCategories(): Promise<Category[]> {
@@ -24,8 +25,58 @@ export async function getBrands(): Promise<Brand[]> {
 
 export async function getFabrics(): Promise<Fabric[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("fabrics").select("*").eq("is_active", true);
+  const { data } = await supabase.from("fabrics").select("*").eq("is_active", true).order("name");
   return data || [];
+}
+
+export async function getDistinctProductColors(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("products").select("colors").eq("is_active", true);
+  const colorSet = new Set<string>();
+  for (const row of data || []) {
+    for (const color of row.colors || []) {
+      if (color) colorSet.add(color);
+    }
+  }
+  return mergeUniqueColors(FILTER_COLORS, Array.from(colorSet));
+}
+
+export async function getDistinctProductSizes(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("products").select("sizes").eq("is_active", true);
+  const sizeSet = new Set<string>();
+  for (const row of data || []) {
+    for (const size of row.sizes || []) {
+      if (size) sizeSet.add(size);
+    }
+  }
+  return sortSizes(Array.from(sizeSet));
+}
+
+async function resolveSlugsToIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "categories" | "brands" | "fabrics",
+  slugs: string[]
+): Promise<string[]> {
+  if (!slugs.length) return [];
+  const { data } = await supabase.from(table).select("id, slug").in("slug", slugs);
+  return (data || []).map((row) => row.id);
+}
+
+function buildArrayOrFilter(column: string, values: string[]): string {
+  return values.map((value) => `${column}.cs.{${value}}`).join(",");
+}
+
+function buildPriceRangeOrFilter(ranges: string[]): string | null {
+  const parts = ranges
+    .map((value) => PRICE_RANGES.find((range) => range.value === value))
+    .filter(Boolean)
+    .map((range) => {
+      if (range!.max === null) return `price.gte.${range!.min}`;
+      return `and(price.gte.${range!.min},price.lte.${range!.max})`;
+    });
+
+  return parts.length ? parts.join(",") : null;
 }
 
 async function getActiveDiscounts(): Promise<ProductDiscount[]> {
@@ -88,19 +139,36 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{ produ
     .eq("is_active", true);
 
   if (filters.category) {
-    const { data: cat } = await supabase.from("categories").select("id").eq("slug", filters.category).single();
-    if (cat) query = query.eq("category_id", cat.id);
+    const slugs = parseFilterList(filters.category);
+    const ids = await resolveSlugsToIds(supabase, "categories", slugs);
+    if (ids.length === 1) query = query.eq("category_id", ids[0]);
+    else if (ids.length > 1) query = query.in("category_id", ids);
   }
   if (filters.brand) {
-    const { data: brand } = await supabase.from("brands").select("id").eq("slug", filters.brand).single();
-    if (brand) query = query.eq("brand_id", brand.id);
+    const slugs = parseFilterList(filters.brand);
+    const ids = await resolveSlugsToIds(supabase, "brands", slugs);
+    if (ids.length === 1) query = query.eq("brand_id", ids[0]);
+    else if (ids.length > 1) query = query.in("brand_id", ids);
   }
   if (filters.fabric) {
-    const { data: fabric } = await supabase.from("fabrics").select("id").eq("slug", filters.fabric).single();
-    if (fabric) query = query.eq("fabric_id", fabric.id);
+    const slugs = parseFilterList(filters.fabric);
+    const ids = await resolveSlugsToIds(supabase, "fabrics", slugs);
+    if (ids.length === 1) query = query.eq("fabric_id", ids[0]);
+    else if (ids.length > 1) query = query.in("fabric_id", ids);
   }
-  if (filters.color) query = query.contains("colors", [filters.color]);
-  if (filters.size) query = query.contains("sizes", [filters.size]);
+
+  const colors = parseFilterList(filters.color);
+  if (colors.length === 1) query = query.contains("colors", [colors[0]]);
+  else if (colors.length > 1) query = query.or(buildArrayOrFilter("colors", colors));
+
+  const sizes = parseFilterList(filters.size);
+  if (sizes.length === 1) query = query.contains("sizes", [sizes[0]]);
+  else if (sizes.length > 1) query = query.or(buildArrayOrFilter("sizes", sizes));
+
+  const priceRanges = parseFilterList(filters.priceRange);
+  const priceRangeFilter = buildPriceRangeOrFilter(priceRanges);
+  if (priceRangeFilter) query = query.or(priceRangeFilter);
+
   if (filters.minPrice) query = query.gte("price", filters.minPrice);
   if (filters.maxPrice) query = query.lte("price", filters.maxPrice);
   if (filters.inStock) query = query.gt("stock", 0);
@@ -144,7 +212,8 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
   const discounts = await getActiveDiscounts();
   const flashSales = await getActiveFlashSales();
-  return applyDiscountsToProduct(data as Product, discounts, flashSales);
+  const product = applyDiscountsToProduct(data as Product, discounts, flashSales);
+  return { ...product, sizes: sortSizes(product.sizes || []) };
 }
 
 export async function getFeaturedProducts(type: "featured" | "new_arrival" | "trending" | "best_seller", limit = 8): Promise<Product[]> {

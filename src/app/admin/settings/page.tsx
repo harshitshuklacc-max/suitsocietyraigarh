@@ -15,6 +15,9 @@ import { BRAND, DEFAULT_ADMIN } from "@/lib/constants";
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingSizeChart, setSavingSizeChart] = useState(false);
+  const [uploadingSizeChart, setUploadingSizeChart] = useState(false);
+  const [sizeChartUrl, setSizeChartUrl] = useState("/size-chart.svg");
   const [admin, setAdmin] = useState<{ username: string; must_change_credentials?: boolean } | null>(null);
   const [form, setForm] = useState({
     username: "",
@@ -29,6 +32,8 @@ export default function AdminSettingsPage() {
       .then((d) => {
         setAdmin(d.admin);
         setForm((f) => ({ ...f, username: d.admin?.username || "" }));
+        const sizeChartSetting = (d.settings || []).find((item: { key: string }) => item.key === "size_chart");
+        if (sizeChartSetting?.value?.url) setSizeChartUrl(sizeChartSetting.value.url);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -62,6 +67,42 @@ export default function AdminSettingsPage() {
       toast.error(err instanceof Error ? err.message : "Update failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSizeChartUpload = async (file: File) => {
+    setUploadingSizeChart(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("bucket", "images");
+      const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Upload failed");
+      setSizeChartUrl(uploadData.url);
+      toast.success("Size chart uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingSizeChart(false);
+    }
+  };
+
+  const handleSaveSizeChart = async () => {
+    setSavingSizeChart(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sizeChartUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("Size chart updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setSavingSizeChart(false);
     }
   };
 
@@ -126,6 +167,46 @@ export default function AdminSettingsPage() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
             </AdminButton>
           </form>
+        </AdminCard>
+
+        <AdminCard>
+          <h3 className="text-white font-medium mb-4">Size Chart Image</h3>
+          <p className="text-sm text-zinc-400 mb-4">
+            Upload or paste a URL for the size chart shown on the storefront Size Chart page.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-1">Image URL</label>
+              <AdminInput
+                value={sizeChartUrl}
+                onChange={(e) => setSizeChartUrl(e.target.value)}
+                placeholder="/size-chart.svg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-zinc-400 mb-1">Upload Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleSizeChartUpload(file);
+                }}
+                disabled={uploadingSizeChart}
+                className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30"
+              />
+              {uploadingSizeChart && <p className="text-xs text-zinc-500 mt-1">Uploading...</p>}
+            </div>
+            {sizeChartUrl && (
+              <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={sizeChartUrl} alt="Size chart preview" className="w-full max-h-64 object-contain" />
+              </div>
+            )}
+            <AdminButton type="button" onClick={handleSaveSizeChart} disabled={savingSizeChart}>
+              {savingSizeChart ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Size Chart"}
+            </AdminButton>
+          </div>
         </AdminCard>
 
         <AdminCard>

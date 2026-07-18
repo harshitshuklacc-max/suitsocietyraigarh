@@ -22,16 +22,12 @@ import { WhatsAppFloat } from "@/components/shop/whatsapp-float";
 
 import { ArrowRight, Sparkles } from "lucide-react";
 
-
+const HOMEPAGE_PRODUCT_LIMIT = 20;
 
 export default async function HomePage() {
-
-  const [homepage, { products }] = await Promise.all([
-
+  const [homepage, { products, total }] = await Promise.all([
     getHomepageData(),
-
-    getProducts({ limit: 48, sort: "newest" }),
-
+    getProducts({ limit: HOMEPAGE_PRODUCT_LIMIT, sort: "newest" }),
   ]);
 
 
@@ -79,7 +75,7 @@ export default async function HomePage() {
           <div>
             <h2 className="font-serif text-2xl md:text-4xl tracking-wider">SHOP COLLECTION</h2>
             <p className="text-muted-foreground text-sm mt-1">
-              {products.length > 0 ? `${products.length}+ premium styles` : "New arrivals coming soon"}
+              {total > 0 ? `${total}+ premium styles` : "New arrivals coming soon"}
             </p>
           </div>
           <Link href="/products" className="text-sm tracking-wider hover:text-gold flex items-center gap-1 shrink-0">
@@ -88,11 +84,22 @@ export default async function HomePage() {
         </div>
 
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} showBadge={p.is_new_arrival ? "new" : p.is_trending ? "trending" : null} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-5">
+              {products.map((p) => (
+                <ProductCard key={p.id} product={p} showBadge={p.is_new_arrival ? "new" : p.is_trending ? "trending" : null} />
+              ))}
+            </div>
+            {total > HOMEPAGE_PRODUCT_LIMIT && (
+              <div className="flex justify-center mt-8 md:mt-10">
+                <Link href="/products">
+                  <Button variant="luxury" size="lg" className="px-10 tracking-wider">
+                    View More <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-20 bg-muted/30 rounded-xl">
             <p className="text-muted-foreground mb-4">Products will appear here once added from admin panel.</p>
@@ -151,7 +158,7 @@ export default async function HomePage() {
 
       {homepage.categories.length > 0 && (
 
-        <section className="container mx-auto px-4">
+        <section id="shop-by-category" className="container mx-auto px-4">
 
           <div className="text-center mb-8">
 

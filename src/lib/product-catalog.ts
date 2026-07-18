@@ -21,19 +21,34 @@ export const CATALOG_FABRICS = [
 
 /** Colors used in the Suit Society product spreadsheet */
 export const CATALOG_COLORS = [
-  "Red",
-  "Green",
   "Black",
   "White",
+  "Blue",
+  "Red",
+  "Green",
+  "Yellow",
   "Pink",
+  "Purple",
+  "Grey",
+  "Brown",
+  "Cream",
+  "Beige",
+  "Maroon",
+  "Navy",
+  "Multi Color",
   "Golden",
   "Ivory",
-  "Maroon",
-  "Blue",
 ] as const;
 
-/** Common size labels from the spreadsheet */
+/** Common size labels — ascending order */
 export const CATALOG_SIZES = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "3XL",
   "M (38)",
   "L (40)",
   "XL (42)",

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, LogOut, MapPin, Package, Star } from "lucide-react";
 import { toast } from "sonner";
 import { formatPrice } from "@/lib/utils";
+import { useWishlist } from "@/context/WishlistContext";
 
 type Tab = "orders" | "addresses" | "reviews";
 
@@ -18,6 +19,7 @@ interface User {
 
 export default function AccountPage() {
   const router = useRouter();
+  const { refreshWishlist } = useWishlist();
   const [redirectTo, setRedirectTo] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,6 +132,7 @@ export default function AccountPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setUser(data.user);
+      await refreshWishlist();
       toast.success("Logged in successfully");
       if (redirectTo) router.push(redirectTo);
     } catch (err) {
@@ -145,6 +148,7 @@ export default function AccountPage() {
     setOrders([]);
     setAddresses([]);
     setReviews([]);
+    await refreshWishlist();
     toast.success("Logged out");
   };
 

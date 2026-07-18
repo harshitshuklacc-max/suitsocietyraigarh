@@ -15,8 +15,8 @@ export function Footer() {
               Premium luxury fashion for the modern gentleman. Crafted with excellence in Raigarh, Chhattisgarh.
             </p>
             <div className="flex gap-4 mt-6">
-              <a href="#" className="hover:text-gold transition-colors"><Instagram className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-gold transition-colors"><Facebook className="w-5 h-5" /></a>
+              <a href="#" className="hover:text-gold transition-colors" aria-label="Instagram"><Instagram className="w-5 h-5" /></a>
+              <a href="#" className="hover:text-gold transition-colors" aria-label="Facebook"><Facebook className="w-5 h-5" /></a>
             </div>
           </div>
 
@@ -34,8 +34,11 @@ export function Footer() {
           <div>
             <h4 className="font-serif text-lg mb-4 tracking-wider">CUSTOMER CARE</h4>
             <ul className="space-y-2 text-sm text-white/70">
-              <li><Link href="/account" className="hover:text-gold transition-colors">Track Order</Link></li>
+              <li><Link href="/track-order" className="hover:text-gold transition-colors">Track Order</Link></li>
               <li><Link href="/contact" className="hover:text-gold transition-colors">Contact Us</Link></li>
+              <li><Link href="/terms" className="hover:text-gold transition-colors">Terms &amp; Conditions</Link></li>
+              <li><Link href="/refund" className="hover:text-gold transition-colors">Refund / Return Policy</Link></li>
+              <li><Link href="/size-chart" className="hover:text-gold transition-colors">Size Chart</Link></li>
             </ul>
           </div>
 

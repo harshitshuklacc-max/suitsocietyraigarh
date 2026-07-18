@@ -7,9 +7,13 @@ import { formatPrice, calculateDiscountPercentage } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/providers/cart-provider";
+import { useWishlist } from "@/context/WishlistContext";
+import { formatProductDescription, sortSizes } from "@/lib/product-utils";
+import { DEFAULT_PRODUCT_NOTICE } from "@/lib/product-notice";
+import { cn } from "@/lib/utils";
 import { Heart, ShoppingBag, Minus, Plus, ZoomIn, Star, Truck, Shield, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import Link from "next/link";
 
 const HIDDEN_SPEC_KEYS = new Set(["cost_price", "discount_percent", "cost price", "discount percent"]);
 
@@ -26,9 +30,11 @@ interface Props {
 
 export function ProductDetail({ product }: Props) {
   const { addItem } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const sortedSizes = sortSizes(product.sizes);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.colors[0] || "");
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0] || "");
+  const [selectedSize, setSelectedSize] = useState(sortedSizes[0] || "");
   const [quantity, setQuantity] = useState(1);
   const [zoomed, setZoomed] = useState(false);
 
@@ -128,7 +134,7 @@ export function ProductDetail({ product }: Props) {
           )}
 
           <p className={`text-sm font-medium ${product.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {product.stock > 0 ? `In Stock (${product.stock} available)` : "Out of Stock"}
+            {product.stock > 0 ? `${product.stock} Available` : "Out of Stock"}
           </p>
 
           {product.colors.length > 0 && (
@@ -145,11 +151,14 @@ export function ProductDetail({ product }: Props) {
             </div>
           )}
 
-          {product.sizes.length > 0 && (
+          {sortedSizes.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">Size: {selectedSize}</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">Size: {selectedSize}</p>
+                <Link href="/size-chart" className="text-xs text-gold hover:underline">Size Chart</Link>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {product.sizes.map((s) => (
+                {sortedSizes.map((s) => (
                   <button key={s} onClick={() => setSelectedSize(s)}
                     className={`w-12 h-12 text-sm border rounded-md transition-colors ${
                       selectedSize === s ? "border-gold bg-gold/10" : "hover:border-gold/50"
@@ -175,21 +184,40 @@ export function ProductDetail({ product }: Props) {
             <Button variant="luxury" size="lg" className="flex-1" onClick={handleAddToCart} disabled={product.stock <= 0}>
               <ShoppingBag className="w-5 h-5 mr-2" /> Add to Cart
             </Button>
-            <Button variant="outline" size="lg"><Heart className="w-5 h-5" /></Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                const wasInWishlist = isInWishlist(product.id);
+                toggleWishlist(product.id);
+                toast.success(wasInWishlist ? "Removed from wishlist" : "Added to wishlist");
+              }}
+              className={cn(isInWishlist(product.id) && "border-red-500 text-red-500")}
+            >
+              <Heart className={cn("w-5 h-5", isInWishlist(product.id) && "fill-current")} />
+            </Button>
           </div>
 
           <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-            <div className="text-center"><Truck className="w-5 h-5 mx-auto mb-1 text-gold" /><p className="text-xs">Free Shipping</p></div>
+            <div className="text-center"><Truck className="w-5 h-5 mx-auto mb-1 text-gold" /><p className="text-xs">Free Delivery</p></div>
             <div className="text-center"><Shield className="w-5 h-5 mx-auto mb-1 text-gold" /><p className="text-xs">Secure Payment</p></div>
-            <div className="text-center"><RotateCcw className="w-5 h-5 mx-auto mb-1 text-gold" /><p className="text-xs">Easy Returns</p></div>
+            <div className="text-center"><RotateCcw className="w-5 h-5 mx-auto mb-1 text-gold" /><p className="text-xs">Same-Day Shipping</p></div>
           </div>
 
           {product.description && (
             <div className="pt-4 border-t">
               <h3 className="font-serif text-lg mb-2">Description</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{product.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                {formatProductDescription(product.description)}
+              </p>
             </div>
           )}
+
+          <div className="pt-4 border-t">
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{DEFAULT_PRODUCT_NOTICE}</p>
+            </div>
+          </div>
 
           {visibleSpecs.length > 0 && (
             <div className="pt-4 border-t">
