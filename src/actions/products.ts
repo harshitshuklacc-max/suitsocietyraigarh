@@ -364,6 +364,53 @@ function buildProductPayload(formData: FormData) {
   };
 }
 
+type ProductVideoInput = { url: string; title?: string | null };
+
+async function syncProductVideos(
+  productId: string,
+  formData: FormData
+): Promise<{ success?: boolean; error?: string }> {
+  const rawVideos = formData.get("videos");
+  if (!rawVideos) return { success: true };
+
+  let videos: ProductVideoInput[] = [];
+  try {
+    const parsed = JSON.parse(rawVideos as string);
+    if (Array.isArray(parsed)) {
+      videos = parsed
+        .map((item) => ({
+          url: String(item?.url || "").trim(),
+          title: item?.title ? String(item.title) : null,
+        }))
+        .filter((item) => item.url);
+    }
+  } catch {
+    return { error: "Invalid video data" };
+  }
+
+  if (!videos.length) return { success: true };
+
+  const supabase = await createServiceClient();
+  const { error: deleteError } = await supabase
+    .from("product_videos")
+    .delete()
+    .eq("product_id", productId);
+
+  if (deleteError) return { error: deleteError.message };
+
+  const { error: insertError } = await supabase.from("product_videos").insert(
+    videos.map((video, index) => ({
+      product_id: productId,
+      url: video.url,
+      title: video.title || null,
+      sort_order: index,
+    }))
+  );
+
+  if (insertError) return { error: insertError.message };
+  return { success: true };
+}
+
 export async function createProduct(formData: FormData) {
   const supabase = await createServiceClient();
   const payload = buildProductPayload(formData);
