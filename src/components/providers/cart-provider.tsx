@@ -5,9 +5,9 @@ import { CartItem } from "@/types";
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => boolean;
   removeItem: (productId: string, color?: string, size?: string) => void;
-  updateQuantity: (productId: string, quantity: number, color?: string, size?: string) => void;
+  updateQuantity: (productId: string, quantity: number, color?: string, size?: string) => boolean;
   clearCart: () => void;
   total: number;
   itemCount: number;
@@ -29,18 +29,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("ss_cart", JSON.stringify(items));
   }, [items]);
 
-  const addItem = useCallback((item: CartItem) => {
+  const addItem = useCallback((item: CartItem): boolean => {
+    let added = false;
     setItems((prev) => {
       const idx = prev.findIndex(
         (i) => i.productId === item.productId && i.color === item.color && i.size === item.size
       );
       if (idx >= 0) {
+        const nextQty = prev[idx].quantity + item.quantity;
+        if (nextQty > item.stock) return prev;
         const updated = [...prev];
-        updated[idx].quantity = Math.min(updated[idx].quantity + item.quantity, item.stock);
+        updated[idx].quantity = nextQty;
+        added = true;
         return updated;
       }
+      if (item.quantity > item.stock || item.stock <= 0) return prev;
+      added = true;
       return [...prev, item];
     });
+    return added;
   }, []);
 
   const removeItem = useCallback((productId: string, color?: string, size?: string) => {
@@ -49,14 +56,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const updateQuantity = useCallback((productId: string, quantity: number, color?: string, size?: string) => {
+  const updateQuantity = useCallback((productId: string, quantity: number, color?: string, size?: string): boolean => {
+    let updatedOk = false;
     setItems((prev) =>
-      prev.map((i) =>
-        i.productId === productId && i.color === color && i.size === size
-          ? { ...i, quantity: Math.max(1, Math.min(quantity, i.stock)) }
-          : i
-      )
+      prev.map((i) => {
+        if (i.productId !== productId || i.color !== color || i.size !== size) return i;
+        const nextQty = Math.max(1, Math.min(quantity, i.stock));
+        updatedOk = nextQty === quantity || quantity <= i.stock;
+        return { ...i, quantity: nextQty };
+      })
     );
+    return updatedOk;
   }, []);
 
   const clearCart = useCallback(() => setItems([]), []);

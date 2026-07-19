@@ -4,6 +4,7 @@ import { getUserSession } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
 import { createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { parseSizeStock, getSizeStock, syncProductTotalStock } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 import { CartItem } from "@/types";
 
@@ -61,6 +62,26 @@ export async function createOrder(data: CheckoutData) {
   const subtotal = data.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   let couponDiscount = 0;
 
+  const productIds = [...new Set(data.items.map((i) => i.productId))];
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, stock, size_stock, sizes")
+    .in("id", productIds);
+  const productMap = new Map((products || []).map((p) => [p.id, p]));
+
+  for (const item of data.items) {
+    const product = productMap.get(item.productId);
+    if (!product) return { error: `Product not found: ${item.name}` };
+    const available = getSizeStock(product, item.size);
+    if (available < item.quantity) {
+      return {
+        error: item.size
+          ? `Only ${available} available for ${item.name} (Size ${item.size})`
+          : `Insufficient stock for ${item.name}`,
+      };
+    }
+  }
+
   if (data.couponCode) {
     const result = await validateCoupon(
       data.couponCode,
@@ -93,13 +114,13 @@ export async function createOrder(data: CheckoutData) {
 
   if (error) return { error: error.message };
 
-  const productIds = [...new Set(data.items.map((i) => i.productId))];
-  const { data: products } = await supabase
+  const productIdsForCodes = [...new Set(data.items.map((i) => i.productId))];
+  const { data: productCodes } = await supabase
     .from("products")
     .select("id, barcode, sku")
-    .in("id", productIds);
+    .in("id", productIdsForCodes);
   const codeByProduct = new Map(
-    (products || []).map((p) => [p.id, p.barcode || p.sku || null])
+    (productCodes || []).map((p) => [p.id, p.barcode || p.sku || null])
   );
 
   const orderItems = data.items.map((item) => ({
@@ -137,43 +158,109 @@ export async function verifyPayment(
   const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
   if (!isValid) return { error: "Payment verification failed" };
 
+  return fulfillPaidOrder(orderId, razorpayPaymentId);
+}
+
+export async function fulfillPaidOrder(orderId: string, razorpayPaymentId?: string) {
   const supabase = await createServiceClient();
-  const { data: order } = await supabase.from("orders").select("*, items:order_items(*)").eq("id", orderId).single();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("*, items:order_items(*)")
+    .eq("id", orderId)
+    .single();
+
   if (!order) return { error: "Order not found" };
+  if (order.payment_status === "paid") {
+    return { success: true, orderNumber: order.order_number, alreadyPaid: true };
+  }
 
-  await supabase.from("orders").update({
-    payment_status: "paid",
-    status: "confirmed",
-    razorpay_payment_id: razorpayPaymentId,
-  }).eq("id", orderId);
+  await supabase
+    .from("orders")
+    .update({
+      payment_status: "paid",
+      status: "confirmed",
+      ...(razorpayPaymentId ? { razorpay_payment_id: razorpayPaymentId } : {}),
+    })
+    .eq("id", orderId);
 
-  // Deduct stock
   for (const item of order.items) {
     if (item.product_id) {
-      const { data: product } = await supabase.from("products").select("stock, sales_count").eq("id", item.product_id).single();
+      const { data: product } = await supabase
+        .from("products")
+        .select("stock, sales_count, size_stock, sizes")
+        .eq("id", item.product_id)
+        .single();
       if (product) {
-        const newStock = Math.max(0, product.stock - item.quantity);
-        await supabase.from("products").update({ stock: newStock, sales_count: (product.sales_count || 0) + item.quantity }).eq("id", item.product_id);
+        const sizeStock = parseSizeStock(product.size_stock);
+        let previousStock = product.stock;
+        let newStock = Math.max(0, product.stock - item.quantity);
+        const updates: Record<string, unknown> = {
+          sales_count: (product.sales_count || 0) + item.quantity,
+        };
+
+        const useSizeStock =
+          item.size &&
+          (Object.keys(sizeStock).length > 0 || (product.sizes?.length ?? 0) > 0);
+
+        if (useSizeStock && item.size) {
+          const prevSizeQty = sizeStock[item.size] ?? 0;
+          sizeStock[item.size] = Math.max(0, prevSizeQty - item.quantity);
+          previousStock = prevSizeQty;
+          newStock = sizeStock[item.size];
+          updates.size_stock = sizeStock;
+          updates.stock = syncProductTotalStock(sizeStock, product.stock - item.quantity);
+        } else {
+          updates.stock = newStock;
+        }
+
+        await supabase.from("products").update(updates).eq("id", item.product_id);
         await supabase.from("inventory").insert({
           product_id: item.product_id,
           type: "sale",
           quantity: item.quantity,
-          previous_stock: product.stock,
+          previous_stock: previousStock,
           new_stock: newStock,
+          notes: item.size ? `Size ${item.size}` : null,
         });
       }
     }
   }
 
   if (order.coupon_code) {
-    const { data: coupon } = await supabase.from("coupons").select("usage_count").eq("code", order.coupon_code).single();
+    const { data: coupon } = await supabase
+      .from("coupons")
+      .select("usage_count")
+      .eq("code", order.coupon_code)
+      .single();
     if (coupon) {
-      await supabase.from("coupons").update({ usage_count: coupon.usage_count + 1 }).eq("code", order.coupon_code);
+      await supabase
+        .from("coupons")
+        .update({ usage_count: coupon.usage_count + 1 })
+        .eq("code", order.coupon_code);
     }
   }
 
   revalidatePath("/admin/orders");
   return { success: true, orderNumber: order.order_number };
+}
+
+export async function markOrderPaymentFailed(razorpayOrderId: string) {
+  const supabase = await createServiceClient();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, payment_status")
+    .eq("razorpay_order_id", razorpayOrderId)
+    .single();
+
+  if (!order || order.payment_status === "paid") return { success: true };
+
+  await supabase
+    .from("orders")
+    .update({ payment_status: "failed", status: "cancelled" })
+    .eq("id", order.id);
+
+  revalidatePath("/admin/orders");
+  return { success: true };
 }
 
 export async function getOrders(status?: string) {

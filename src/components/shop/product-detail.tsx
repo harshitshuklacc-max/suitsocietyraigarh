@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Product } from "@/types";
 import { formatPrice, calculateDiscountPercentage } from "@/lib/utils";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/providers/cart-provider";
 import { useWishlist } from "@/context/WishlistContext";
 import { formatProductDescription, sortSizes } from "@/lib/product-utils";
+import { getPrimaryImageUrl } from "@/lib/product-images";
+import { getSizeStock, isSizeInStock, parseSizeStock } from "@/lib/inventory";
 import { DEFAULT_PRODUCT_NOTICE } from "@/lib/product-notice";
 import { cn } from "@/lib/utils";
 import { Heart, ShoppingBag, Minus, Plus, ZoomIn, Star, Truck, Shield, RotateCcw } from "lucide-react";
@@ -32,13 +34,26 @@ export function ProductDetail({ product }: Props) {
   const { addItem } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const sortedSizes = sortSizes(product.sizes);
+  const sizeStock = parseSizeStock(product.size_stock);
+  const hasSizeStock = Object.keys(sizeStock).length > 0;
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.colors[0] || "");
-  const [selectedSize, setSelectedSize] = useState(sortedSizes[0] || "");
+  const [selectedSize, setSelectedSize] = useState(
+    sortedSizes.find((s) => isSizeInStock(product, s)) || sortedSizes[0] || ""
+  );
   const [quantity, setQuantity] = useState(1);
   const [zoomed, setZoomed] = useState(false);
 
-  const images = product.images || [];
+  const images = useMemo(
+    () =>
+      [...(product.images || [])].sort(
+        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      ),
+    [product.images]
+  );
+  const displayImages = images.length > 0 ? images : [];
+
   const mrp = product.compare_at_price ?? product.price;
   const sellingPrice = product.effective_price ?? product.price;
   const hasDiscount = mrp > sellingPrice;
@@ -49,30 +64,53 @@ export function ProductDetail({ product }: Props) {
     ? getVisibleSpecifications(product.specifications as Record<string, unknown>)
     : [];
 
+  const selectedSizeStock = getSizeStock(product, selectedSize || undefined);
+  const inStock = selectedSize ? selectedSizeStock > 0 : (product.stock > 0 || getSizeStock(product) > 0);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedSize]);
+
+  useEffect(() => {
+    if (quantity > selectedSizeStock && selectedSizeStock > 0) {
+      setQuantity(selectedSizeStock);
+    }
+  }, [selectedSizeStock, quantity]);
+
   const handleAddToCart = () => {
-    if (product.stock <= 0) { toast.error("Out of stock"); return; }
-    addItem({
+    if (!selectedSize && sortedSizes.length > 0) {
+      toast.error("Please select a size");
+      return;
+    }
+    if (!inStock) {
+      toast.error("Out of stock for selected size");
+      return;
+    }
+    const added = addItem({
       productId: product.id,
       name: product.name,
-      image: images[0]?.url || "",
+      image: getPrimaryImageUrl(displayImages, ""),
       price: sellingPrice,
       compareAtPrice: hasDiscount ? mrp : undefined,
       color: selectedColor,
       size: selectedSize,
       quantity,
-      stock: product.stock,
+      stock: selectedSizeStock,
     });
+    if (!added) {
+      toast.error(`Only ${selectedSizeStock} available in size ${selectedSize}`);
+      return;
+    }
     toast.success("Added to cart");
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-        {/* Image Gallery */}
         <div className="space-y-4">
           <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-muted cursor-zoom-in" onClick={() => setZoomed(!zoomed)}>
-            {images.length > 0 ? (
-              <Image src={images[selectedImage]?.url} alt={product.name} fill
+            {displayImages.length > 0 ? (
+              <Image src={displayImages[selectedImage]?.url} alt={product.name} fill
                 className={`object-cover transition-transform duration-300 ${zoomed ? "scale-150" : ""}`} priority />
             ) : (
               <div className="absolute inset-0 luxury-gradient flex items-center justify-center text-muted-foreground">No Image</div>
@@ -82,9 +120,9 @@ export function ProductDetail({ product }: Props) {
             </button>
             {hasDiscount && <Badge variant="sale" className="absolute top-4 left-4 text-sm">{discountPct}% OFF</Badge>}
           </div>
-          {images.length > 1 && (
+          {displayImages.length > 1 && (
             <div className="flex gap-2 overflow-x-auto">
-              {images.map((img, i) => (
+              {displayImages.map((img, i) => (
                 <button key={img.id} onClick={() => setSelectedImage(i)}
                   className={`relative w-20 h-24 rounded-md overflow-hidden shrink-0 border-2 transition-colors ${
                     i === selectedImage ? "border-gold" : "border-transparent"
@@ -103,7 +141,6 @@ export function ProductDetail({ product }: Props) {
           )}
         </div>
 
-        {/* Product Info */}
         <div className="space-y-6">
           {product.brand && <p className="text-sm text-muted-foreground tracking-widest uppercase">{product.brand.name}</p>}
           <h1 className="font-serif text-3xl md:text-4xl tracking-wide">{product.name}</h1>
@@ -133,14 +170,20 @@ export function ProductDetail({ product }: Props) {
             <p className="text-sm"><span className="text-muted-foreground">Fabric:</span> {product.fabric.name}</p>
           )}
 
-          <p className={`text-sm font-medium ${product.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {product.stock > 0 ? `${product.stock} Available` : "Out of Stock"}
-          </p>
+          {selectedSize && (
+            <p className={`text-sm font-medium ${inStock ? "text-emerald-600" : "text-red-500"}`}>
+              {inStock
+                ? hasSizeStock
+                  ? `${selectedSizeStock} available in size ${selectedSize}`
+                  : "In Stock"
+                : "Out of Stock"}
+            </p>
+          )}
 
           {product.colors.length > 0 && (
             <div>
               <p className="text-sm font-medium mb-2">Color: {selectedColor}</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {product.colors.map((c) => (
                   <button key={c} onClick={() => setSelectedColor(c)}
                     className={`px-4 py-2 text-sm border rounded-md transition-colors ${
@@ -154,16 +197,27 @@ export function ProductDetail({ product }: Props) {
           {sortedSizes.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium">Size: {selectedSize}</p>
+                <p className="text-sm font-medium">Size: {selectedSize || "Select size"}</p>
                 <Link href="/size-chart" className="text-xs text-gold hover:underline">Size Chart</Link>
               </div>
               <div className="flex flex-wrap gap-2">
-                {sortedSizes.map((s) => (
-                  <button key={s} onClick={() => setSelectedSize(s)}
-                    className={`w-12 h-12 text-sm border rounded-md transition-colors ${
-                      selectedSize === s ? "border-gold bg-gold/10" : "hover:border-gold/50"
-                    }`}>{s}</button>
-                ))}
+                {sortedSizes.map((s) => {
+                  const sizeAvailable = isSizeInStock(product, s);
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => sizeAvailable && setSelectedSize(s)}
+                      disabled={!sizeAvailable}
+                      className={cn(
+                        "min-w-[3rem] h-12 px-2 text-sm border rounded-md transition-colors",
+                        !sizeAvailable && "opacity-40 cursor-not-allowed line-through",
+                        selectedSize === s && sizeAvailable ? "border-gold bg-gold/10" : "hover:border-gold/50"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -174,14 +228,18 @@ export function ProductDetail({ product }: Props) {
                 <Minus className="w-4 h-4" />
               </button>
               <span className="w-10 text-center">{quantity}</span>
-              <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="w-10 h-10 flex items-center justify-center hover:bg-muted">
+              <button
+                onClick={() => setQuantity(Math.min(selectedSizeStock || product.stock, quantity + 1))}
+                disabled={!inStock || quantity >= selectedSizeStock}
+                className="w-10 h-10 flex items-center justify-center hover:bg-muted disabled:opacity-40"
+              >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <Button variant="luxury" size="lg" className="flex-1" onClick={handleAddToCart} disabled={product.stock <= 0}>
+            <Button variant="luxury" size="lg" className="flex-1" onClick={handleAddToCart} disabled={!inStock}>
               <ShoppingBag className="w-5 h-5 mr-2" /> Add to Cart
             </Button>
             <Button

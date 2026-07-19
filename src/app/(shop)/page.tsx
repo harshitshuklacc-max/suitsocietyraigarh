@@ -18,8 +18,6 @@ import { CustomerReviewsSection } from "@/components/shop/customer-reviews-secti
 
 import { NewsletterForm } from "@/components/shop/newsletter-form";
 
-import { WhatsAppFloat } from "@/components/shop/whatsapp-float";
-
 import { ArrowRight, Sparkles } from "lucide-react";
 
 const HOMEPAGE_PRODUCT_LIMIT = 20;
@@ -166,7 +164,7 @@ export default async function HomePage() {
 
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-w-md md:max-w-none mx-auto md:mx-0">
 
             {homepage.categories.map((cat) => (
 
@@ -293,8 +291,6 @@ export default async function HomePage() {
         </div>
 
       </section>
-
-      <WhatsAppFloat />
 
     </div>
 

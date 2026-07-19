@@ -14,6 +14,9 @@ export interface Product {
   colors: string[];
   sizes: string[];
   stock: number;
+  cost_price?: number | null;
+  discount_percent?: number | null;
+  size_stock?: Record<string, number> | null;
   low_stock_threshold: number;
   is_active: boolean;
   is_featured: boolean;
@@ -35,7 +38,6 @@ export interface Product {
   fabric?: Fabric;
   effective_price?: number;
   discount_percentage?: number;
-  discount_percent?: number;
   flash_sale?: boolean;
   reviews?: Review[];
 }

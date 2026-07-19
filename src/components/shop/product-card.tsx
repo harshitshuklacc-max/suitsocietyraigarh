@@ -13,6 +13,7 @@ import { useCart } from "@/components/providers/cart-provider";
 import { useWishlist } from "@/context/WishlistContext";
 import { cn } from "@/lib/utils";
 import { sortSizes } from "@/lib/product-utils";
+import { getSizeStock, isSizeInStock } from "@/lib/inventory";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -31,20 +32,31 @@ export function ProductCard({ product, showBadge }: ProductCardProps) {
     ? product.discount_percentage || calculateDiscountPercentage(mrp, sellingPrice)
     : 0;
 
+  const defaultSize = sortSizes(product.sizes).find((s) => isSizeInStock(product, s));
+  const defaultStock = defaultSize ? getSizeStock(product, defaultSize) : product.stock;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({
+    if (defaultStock <= 0) {
+      toast.error("Out of stock");
+      return;
+    }
+    const added = addItem({
       productId: product.id,
       name: product.name,
       image,
       price: sellingPrice,
       compareAtPrice: hasDiscount ? mrp : undefined,
       color: product.colors[0],
-      size: sortSizes(product.sizes)[0],
+      size: defaultSize,
       quantity: 1,
-      stock: product.stock,
+      stock: defaultStock,
     });
+    if (!added) {
+      toast.error("Unable to add — stock limit reached");
+      return;
+    }
     toast.success("Added to cart");
   };
 

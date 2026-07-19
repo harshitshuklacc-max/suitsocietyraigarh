@@ -10,13 +10,24 @@ export const CATALOG_CATEGORIES = [
   "Night Suits",
 ] as const;
 
-/** Fabric types from the Suit Society product spreadsheet */
+/** Fabric types from the Suit Society product spreadsheet (16 fabrics) */
 export const CATALOG_FABRICS = [
   "Cotton",
   "Imported Fabric",
   "Silk",
   "Mul Cotton",
   "Dola Silk",
+  "Georgette",
+  "Chiffon",
+  "Linen",
+  "Velvet",
+  "Organza",
+  "Crepe",
+  "Rayon",
+  "Net",
+  "Jacquard",
+  "Satin",
+  "Khadi",
 ] as const;
 
 /** Colors used in the Suit Society product spreadsheet */
@@ -38,21 +49,23 @@ export const CATALOG_COLORS = [
   "Multi Color",
   "Golden",
   "Ivory",
+  "Lavender",
+  "Rust",
+  "Off White",
 ] as const;
 
-/** Common size labels — ascending order */
+/** Full size range S through 7XL */
 export const CATALOG_SIZES = [
-  "XS",
   "S",
   "M",
   "L",
   "XL",
   "XXL",
   "3XL",
-  "M (38)",
-  "L (40)",
-  "XL (42)",
-  "XXL (44)",
+  "4XL",
+  "5XL",
+  "6XL",
+  "7XL",
 ] as const;
 
 export type ExcelProductRow = {
@@ -122,10 +135,20 @@ export function parseColorList(colorText: string): string[] {
     .filter(Boolean);
 }
 
+/** @param discountPercent 0–100 (percentage) or 0–1 (fraction from Excel import) */
 export function calculateSellingPrice(mrp: number, discountPercent: number): number {
   if (!mrp) return 0;
-  const discount = Math.min(Math.max(discountPercent, 0), 1);
-  return Math.round(mrp * (1 - discount) * 100) / 100;
+  const pct = discountPercent <= 1 ? discountPercent * 100 : discountPercent;
+  const clamped = Math.min(Math.max(pct, 0), 100);
+  return Math.round(mrp * (1 - clamped / 100) * 100) / 100;
+}
+
+export function capitalizeFabricName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 export function uniqueSlug(base: string, suffix: string): string {

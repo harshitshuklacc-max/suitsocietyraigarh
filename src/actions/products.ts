@@ -5,6 +5,7 @@ import { Product, ProductFilters, Category, Brand, Fabric, FlashSale, Coupon, Pr
 import { slugify, getEffectivePrice, isDateInRange, calculateDiscountPercentage } from "@/lib/utils";
 import { resolveProductBarcode } from "@/lib/barcode";
 import { parseFilterList, PRICE_RANGES, mergeUniqueColors, FILTER_COLORS, sortSizes } from "@/lib/product-utils";
+import { parseSizeStock, syncProductTotalStock, buildSizeStockFromForm } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 
 export async function getCategories(): Promise<Category[]> {
@@ -283,7 +284,7 @@ export async function searchProducts(query: string): Promise<Product[]> {
   return products;
 }
 
-async function saveProductImage(productId: string, file: File) {
+async function saveProductImage(productId: string, file: File, options?: { isPrimary?: boolean; sortOrder?: number }) {
   const supabase = await createServiceClient();
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${productId}/${Date.now()}.${ext}`;
@@ -297,40 +298,78 @@ async function saveProductImage(productId: string, file: File) {
 
   const { data: urlData } = supabase.storage.from("products").getPublicUrl(path);
 
-  const { data: existingImages } = await supabase
-    .from("product_images")
-    .select("id, sort_order")
-    .eq("product_id", productId);
-
-  if (existingImages?.length) {
-    await Promise.all(
-      existingImages.map((image) =>
-        supabase
-          .from("product_images")
-          .update({ sort_order: (image.sort_order ?? 0) + 1 })
-          .eq("id", image.id)
-      )
-    );
+  const isPrimary = options?.isPrimary ?? false;
+  if (isPrimary) {
+    await supabase.from("product_images").update({ is_primary: false }).eq("product_id", productId);
   }
 
-  const insertPayload = {
+  const { error } = await supabase.from("product_images").insert({
     product_id: productId,
     url: urlData.publicUrl,
     alt_text: file.name,
-    sort_order: 0,
-    is_primary: true,
-  };
-
-  if (existingImages?.length) {
-    await supabase
-      .from("product_images")
-      .update({ is_primary: false })
-      .eq("product_id", productId);
-  }
-
-  const { error } = await supabase.from("product_images").insert(insertPayload);
+    sort_order: options?.sortOrder ?? 0,
+    is_primary: isPrimary,
+  });
 
   if (error) return { error: error.message };
+  return { success: true };
+}
+
+async function syncProductImages(
+  productId: string,
+  formData: FormData
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createServiceClient();
+  const rawMeta = formData.get("existing_images");
+  const primaryId = (formData.get("primary_image_id") as string) || "";
+
+  if (rawMeta) {
+    let existing: { id: string; sort_order: number }[] = [];
+    try {
+      existing = JSON.parse(rawMeta as string);
+    } catch {
+      return { error: "Invalid image metadata" };
+    }
+
+    const { data: currentImages } = await supabase
+      .from("product_images")
+      .select("id")
+      .eq("product_id", productId);
+
+    const keepIds = new Set(existing.map((img) => img.id));
+    const toDelete = (currentImages || []).filter((img) => !keepIds.has(img.id));
+
+    for (const img of toDelete) {
+      await supabase.from("product_images").delete().eq("id", img.id);
+    }
+
+    for (const img of existing) {
+      await supabase
+        .from("product_images")
+        .update({
+          sort_order: img.sort_order,
+          is_primary: img.id === primaryId,
+        })
+        .eq("id", img.id);
+    }
+  }
+
+  const imageFiles = formData.getAll("images") as File[];
+  for (let i = 0; i < imageFiles.length; i++) {
+    const file = imageFiles[i];
+    if (!file || file.size === 0) continue;
+    const result = await saveProductImage(productId, file, {
+      sortOrder: 100 + i,
+      isPrimary: !primaryId && i === 0 && !rawMeta,
+    });
+    if (result.error) return result;
+  }
+
+  if (primaryId) {
+    await supabase.from("product_images").update({ is_primary: false }).eq("product_id", productId);
+    await supabase.from("product_images").update({ is_primary: true }).eq("id", primaryId);
+  }
+
   return { success: true };
 }
 
@@ -340,6 +379,16 @@ function buildProductPayload(formData: FormData) {
     parseFloat(formData.get("price") as string) ||
     parseFloat(formData.get("selling_price") as string) ||
     mrp;
+  const costPriceRaw = formData.get("cost_price") as string;
+  const costPrice = costPriceRaw ? parseFloat(costPriceRaw) : null;
+  const discountPercentRaw = formData.get("discount_percent") as string;
+  const discountPercent = discountPercentRaw ? parseFloat(discountPercentRaw) : null;
+
+  const sizes = JSON.parse((formData.get("sizes") as string) || "[]") as string[];
+  let sizeStock = parseSizeStock(JSON.parse((formData.get("size_stock") as string) || "{}"));
+  sizeStock = buildSizeStockFromForm(sizes, sizeStock);
+  const legacyStock = parseInt(formData.get("stock") as string) || 0;
+  const stock = syncProductTotalStock(sizeStock, legacyStock);
 
   return {
     name: formData.get("name") as string,
@@ -347,12 +396,15 @@ function buildProductPayload(formData: FormData) {
     sku: ((formData.get("product_code") as string) || (formData.get("sku") as string) || "").trim() || null,
     price,
     compare_at_price: mrp || null,
+    cost_price: costPrice,
+    discount_percent: discountPercent,
     category_id: (formData.get("category_id") as string) || null,
     brand_id: (formData.get("brand_id") as string) || null,
     fabric_id: (formData.get("fabric_id") as string) || null,
     colors: JSON.parse((formData.get("colors") as string) || "[]"),
-    sizes: JSON.parse((formData.get("sizes") as string) || "[]"),
-    stock: parseInt(formData.get("stock") as string) || 0,
+    sizes,
+    size_stock: sizeStock,
+    stock,
     is_featured: formData.get("is_featured") === "true",
     is_new_arrival: formData.get("is_new_arrival") === "true",
     is_trending: formData.get("is_trending") === "true",
@@ -414,6 +466,11 @@ async function syncProductVideos(
 export async function createProduct(formData: FormData) {
   const supabase = await createServiceClient();
   const payload = buildProductPayload(formData);
+
+  if (payload.cost_price == null || Number.isNaN(payload.cost_price)) {
+    return { error: "Cost price is required" };
+  }
+
   const barcode = await resolveProductBarcode(supabase, payload.sku);
 
   const { data, error } = await supabase.from("products").insert({
@@ -426,9 +483,12 @@ export async function createProduct(formData: FormData) {
 
   const imageFile = formData.get("image") as File | null;
   if (imageFile && imageFile.size > 0) {
-    const imageResult = await saveProductImage(data.id, imageFile);
+    const imageResult = await saveProductImage(data.id, imageFile, { isPrimary: true, sortOrder: 0 });
     if (imageResult.error) return { error: imageResult.error };
   }
+
+  const imagesResult = await syncProductImages(data.id, formData);
+  if (imagesResult.error) return { error: imagesResult.error };
 
   const videoResult = await syncProductVideos(data.id, formData);
   if (videoResult.error) return { error: videoResult.error };
@@ -452,6 +512,11 @@ export async function createProduct(formData: FormData) {
 export async function updateProduct(id: string, formData: FormData) {
   const supabase = await createServiceClient();
   const payload = buildProductPayload(formData);
+
+  if (payload.cost_price == null || Number.isNaN(payload.cost_price)) {
+    return { error: "Cost price is required" };
+  }
+
   const barcode = await resolveProductBarcode(supabase, payload.sku, id);
 
   const { error } = await supabase.from("products").update({ ...payload, barcode }).eq("id", id);
@@ -459,9 +524,12 @@ export async function updateProduct(id: string, formData: FormData) {
 
   const imageFile = formData.get("image") as File | null;
   if (imageFile && imageFile.size > 0) {
-    const imageResult = await saveProductImage(id, imageFile);
+    const imageResult = await saveProductImage(id, imageFile, { isPrimary: true, sortOrder: 0 });
     if (imageResult.error) return { error: imageResult.error };
   }
+
+  const imagesResult = await syncProductImages(id, formData);
+  if (imagesResult.error) return { error: imagesResult.error };
 
   const videoResult = await syncProductVideos(id, formData);
   if (videoResult.error) return { error: videoResult.error };

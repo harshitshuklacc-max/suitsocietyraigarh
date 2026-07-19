@@ -1,4 +1,4 @@
-const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"];
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL"];
 
 const DESCRIPTION_LABELS = [
   "Package Contents",
@@ -53,6 +53,9 @@ export const FILTER_COLORS = [
   "Wine",
   "Teal",
   "Mustard",
+  "Lavender",
+  "Rust",
+  "Off White",
 ] as const;
 
 export const PRICE_RANGES = [
@@ -78,19 +81,23 @@ export function sortSizes(sizes: string[]): string[] {
 
 export function formatProductDescription(description: string): string {
   if (!description) return "";
-  if (description.includes("\n")) return description.trim();
 
-  const labels = [...DESCRIPTION_LABELS].sort((a, b) => b.length - a.length);
-  let formatted = description.trim();
+  let formatted = description.replace(/\r\n/g, "\n").trim();
 
-  for (const label of labels) {
-    formatted = formatted.replace(
-      new RegExp(`\\s+(${label})\\s+`, "gi"),
-      (_, matched: string) => `\n\n${matched}\n`
-    );
+  if (!formatted.includes("\n")) {
+    const labels = [...DESCRIPTION_LABELS].sort((a, b) => b.length - a.length);
+    for (const label of labels) {
+      formatted = formatted.replace(
+        new RegExp(`\\s+(${label})\\s+`, "gi"),
+        (_, matched: string) => `\n\n${matched}\n`
+      );
+    }
   }
 
-  return formatted.trim();
+  return formatted
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
 }
 
 export function parseFilterList(value?: string | string[]): string[] {

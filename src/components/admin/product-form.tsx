@@ -8,30 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createProduct, updateProduct } from "@/actions/products";
-import {
-  CATALOG_COLORS,
-  CATALOG_SIZES,
-} from "@/lib/product-catalog";
+import { calculateSellingPrice } from "@/lib/product-catalog";
+import { parseSizeStock } from "@/lib/inventory";
 import { barcodeFromProductCode } from "@/lib/barcode-utils";
-import { getPrimaryImageUrl } from "@/lib/product-images";
 import { formatPrice, calculateDiscountPercentage } from "@/lib/utils";
 import { BarcodeDisplay } from "@/components/admin/BarcodeDisplay";
+import {
+  ProductImagesManager,
+  buildInitialImages,
+  type ImageEntry,
+} from "@/components/admin/product-images-manager";
 import { toast } from "sonner";
-import { ImagePlus, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import type { Product } from "@/types";
 
-const STOCK_OPTIONS = [0, 1, 2, 5, 10, 15, 20, 25, 50, 100];
-
 type AdminProduct = Product & {
-  images?: { url: string }[];
+  images?: { id: string; url: string; sort_order?: number; is_primary?: boolean }[];
   fabric?: { id: string; name: string } | null;
 };
 
 interface Props {
   categories: { id: string; name: string }[];
   fabrics: { id: string; name: string }[];
+  availableColors?: string[];
   product?: AdminProduct | null;
   availableSizes?: string[];
 }
@@ -39,67 +39,95 @@ interface Props {
 function getInitialPrices(product?: AdminProduct | null) {
   const mrp = product?.compare_at_price != null ? String(product.compare_at_price) : "";
   const sellingPrice = product?.price != null ? String(product.price) : "";
-  return { mrp, sellingPrice };
+  const discountPercent =
+    product?.discount_percent != null ? String(product.discount_percent) : "";
+  return { mrp, sellingPrice, discountPercent };
 }
 
-export function ProductForm({ categories, fabrics, product, availableSizes }: Props) {
+export function ProductForm({
+  categories,
+  fabrics,
+  availableColors = [],
+  product,
+  availableSizes,
+}: Props) {
   const router = useRouter();
   const isEdit = Boolean(product);
   const initialPrices = getInitialPrices(product);
+  const initialSizeStock = parseSizeStock(product?.size_stock);
 
   const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    getPrimaryImageUrl(product?.images, "")
-  );
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [images, setImages] = useState<ImageEntry[]>(() => buildInitialImages(product));
+  const [sellingPriceManual, setSellingPriceManual] = useState(isEdit);
   const [form, setForm] = useState({
     product_code: product?.sku || "",
     name: product?.name || "",
     mrp: initialPrices.mrp,
     selling_price: initialPrices.sellingPrice,
+    discount_percent: initialPrices.discountPercent,
+    cost_price: product?.cost_price != null ? String(product.cost_price) : "",
     category_id: product?.category_id || "",
     color: product?.colors?.[0] || "",
     fabric_id: product?.fabric_id || "",
     sizes: product?.sizes || ([] as string[]),
+    size_stock: initialSizeStock as Record<string, number>,
     description: product?.description || "",
-    stock: product?.stock != null ? String(product.stock) : "0",
     is_active: product?.is_active ?? true,
   });
 
   const mrpValue = parseFloat(form.mrp) || 0;
   const sellingPriceValue = parseFloat(form.selling_price) || 0;
-  const discountPercent =
+  const discountPercentValue = parseFloat(form.discount_percent) || 0;
+  const computedDiscount =
     mrpValue > sellingPriceValue
       ? calculateDiscountPercentage(mrpValue, sellingPriceValue)
       : 0;
 
-  const sizeOptions = availableSizes?.length ? availableSizes : [...CATALOG_SIZES];
+  const colorOptions = availableColors.length ? availableColors : [];
+  const sizeOptions = availableSizes?.length ? availableSizes : [];
   const displaySizes = [...new Set([...sizeOptions, ...form.sizes])];
+  const displayColors = [...new Set([...colorOptions, ...(form.color ? [form.color] : [])])];
 
   const barcodePreview =
     product?.barcode || barcodeFromProductCode(form.product_code) || "";
 
   useEffect(() => {
-    return () => {
-      if (imagePreview?.startsWith("blob:")) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imagePreview]);
+    if (sellingPriceManual || !mrpValue || !discountPercentValue) return;
+    const calculated = calculateSellingPrice(mrpValue, discountPercentValue);
+    setForm((prev) => ({ ...prev, selling_price: String(calculated) }));
+  }, [form.mrp, form.discount_percent, sellingPriceManual, mrpValue, discountPercentValue]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  const handleDiscountChange = (value: string) => {
+    setSellingPriceManual(false);
+    setForm((prev) => ({ ...prev, discount_percent: value }));
+  };
+
+  const handleSellingPriceChange = (value: string) => {
+    setSellingPriceManual(true);
+    setForm((prev) => ({ ...prev, selling_price: value }));
   };
 
   const toggleSize = (size: string) => {
+    setForm((prev) => {
+      const hasSize = prev.sizes.includes(size);
+      const sizes = hasSize
+        ? prev.sizes.filter((s) => s !== size)
+        : [...prev.sizes, size];
+      const size_stock = { ...prev.size_stock };
+      if (!hasSize && size_stock[size] == null) {
+        size_stock[size] = 0;
+      }
+      if (hasSize) {
+        delete size_stock[size];
+      }
+      return { ...prev, sizes, size_stock };
+    });
+  };
+
+  const setSizeStock = (size: string, qty: number) => {
     setForm((prev) => ({
       ...prev,
-      sizes: prev.sizes.includes(size)
-        ? prev.sizes.filter((s) => s !== size)
-        : [...prev.sizes, size],
+      size_stock: { ...prev.size_stock, [size]: Math.max(0, qty) },
     }));
   };
 
@@ -111,14 +139,37 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
     fd.append("price", form.selling_price);
     fd.append("selling_price", form.selling_price);
     fd.append("compare_at_price", form.mrp);
+    fd.append("cost_price", form.cost_price);
+    fd.append(
+      "discount_percent",
+      form.discount_percent || String(computedDiscount || "")
+    );
     fd.append("category_id", form.category_id);
     fd.append("fabric_id", form.fabric_id);
-    fd.append("stock", form.stock);
     fd.append("description", form.description);
     fd.append("colors", JSON.stringify(form.color ? [form.color] : []));
     fd.append("sizes", JSON.stringify(form.sizes));
+    fd.append("size_stock", JSON.stringify(form.size_stock));
+    const totalStock = Object.values(form.size_stock).reduce((sum, qty) => sum + qty, 0);
+    fd.append("stock", String(totalStock));
     fd.append("is_active", form.is_active.toString());
-    if (imageFile) fd.append("image", imageFile);
+
+    const existingImages = images
+      .filter((img) => !img.isNew)
+      .map((img, index) => ({ id: img.id, sort_order: index }));
+    fd.append("existing_images", JSON.stringify(existingImages));
+
+    const primary = images.find((img) => img.is_primary);
+    if (primary && !primary.isNew) {
+      fd.append("primary_image_id", primary.id);
+    }
+
+    images
+      .filter((img) => img.isNew && img.file)
+      .forEach((img) => {
+        if (img.file) fd.append("images", img.file);
+      });
+
     return fd;
   };
 
@@ -130,6 +181,10 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
     }
     if (!form.category_id) {
       toast.error("Select a category");
+      return;
+    }
+    if (!form.cost_price || Number.isNaN(parseFloat(form.cost_price))) {
+      toast.error("Cost price is required");
       return;
     }
 
@@ -166,42 +221,15 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground">
-            Fields match your Excel sheet: Product Code, Product Name, MRP, Selling Price, Category, Color, Fabric, Size, Description, Stock.
+            Product Code, Name, MRP, Cost Price, Discount %, Selling Price, Category, Color, Fabric, Sizes, Size Inventory, Photos, Description.
           </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Product Photo</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="w-40 h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden">
-              {imagePreview ? (
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  width={160}
-                  height={192}
-                  className="object-cover w-full h-full"
-                  unoptimized
-                />
-              ) : (
-                <div className="text-center text-muted-foreground p-4">
-                  <ImagePlus className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-xs">No photo yet</p>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="image">Upload Product Photo</Label>
-              <Input
-                id="image"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleImageChange}
-              />
-            </div>
-          </div>
+        <CardHeader><CardTitle>Product Photos</CardTitle></CardHeader>
+        <CardContent>
+          <ProductImagesManager images={images} onChange={setImages} />
         </CardContent>
       </Card>
 
@@ -229,7 +257,7 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>MRP (₹)</Label>
+              <Label>MRP / Original Price (₹)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -239,13 +267,39 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
               />
             </div>
             <div>
+              <Label>Cost Price (₹) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                required
+                placeholder="Purchase cost"
+                value={form.cost_price}
+                onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Discount Percentage (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="e.g. 20"
+                value={form.discount_percent}
+                onChange={(e) => handleDiscountChange(e.target.value)}
+              />
+            </div>
+            <div>
               <Label>Selling Price (₹)</Label>
               <Input
                 type="number"
                 step="0.01"
-                placeholder="Discounted price"
+                placeholder="Auto-calculated or edit manually"
                 value={form.selling_price}
-                onChange={(e) => setForm({ ...form, selling_price: e.target.value })}
+                onChange={(e) => handleSellingPriceChange(e.target.value)}
               />
             </div>
           </div>
@@ -257,8 +311,10 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
                 <span className="line-through text-muted-foreground">{formatPrice(mrpValue)}</span>{" "}
                 <strong>{formatPrice(sellingPriceValue)}</strong>
               </p>
-              {discountPercent > 0 && (
-                <p className="text-emerald-600 font-medium">{discountPercent}% OFF</p>
+              {(discountPercentValue > 0 || computedDiscount > 0) && (
+                <p className="text-emerald-600 font-medium">
+                  {discountPercentValue || computedDiscount}% OFF
+                </p>
               )}
             </div>
           )}
@@ -286,7 +342,7 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
                 onChange={(e) => setForm({ ...form, color: e.target.value })}
               >
                 <option value="">Select color</option>
-                {CATALOG_COLORS.map((color) => (
+                {displayColors.map((color) => (
                   <option key={color} value={color}>{color}</option>
                 ))}
               </select>
@@ -307,7 +363,7 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
           </div>
 
           <div>
-            <Label className="mb-2 block">Size</Label>
+            <Label className="mb-2 block">Available Sizes</Label>
             <div className="flex flex-wrap gap-2">
               {displaySizes.map((size) => (
                 <button
@@ -326,38 +382,34 @@ export function ProductForm({ categories, fabrics, product, availableSizes }: Pr
             </div>
           </div>
 
+          {form.sizes.length > 0 && (
+            <div>
+              <Label className="mb-2 block">Size-wise Inventory</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Set quantity per size. Use 0 to mark a size as out of stock.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {form.sizes.map((size) => (
+                  <div key={size}>
+                    <Label className="text-xs">{size}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={form.size_stock[size] ?? 0}
+                      onChange={(e) => setSizeStock(size, parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <Label>Description</Label>
             <Textarea
               rows={5}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <Label className="mb-2 block">Stock</Label>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {STOCK_OPTIONS.map((qty) => (
-                <button
-                  key={qty}
-                  type="button"
-                  onClick={() => setForm({ ...form, stock: String(qty) })}
-                  className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                    form.stock === String(qty)
-                      ? "bg-gold/20 border-gold text-gold"
-                      : "border-border hover:border-gold/50"
-                  }`}
-                >
-                  {qty}
-                </button>
-              ))}
-            </div>
-            <Input
-              type="number"
-              min="0"
-              value={form.stock}
-              onChange={(e) => setForm({ ...form, stock: e.target.value })}
             />
           </div>
 

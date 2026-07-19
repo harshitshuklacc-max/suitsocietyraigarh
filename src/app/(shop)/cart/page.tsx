@@ -60,10 +60,20 @@ export default function CartPage() {
                 <p className="font-semibold">{formatPrice(item.price)}</p>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center border rounded-md">
-                    <button onClick={() => updateQuantity(item.productId, item.quantity - 1, item.color, item.size)}
+                    <button onClick={() => {
+                      const ok = updateQuantity(item.productId, item.quantity - 1, item.color, item.size);
+                      if (!ok && item.quantity > 1) toast.error("Unable to update quantity");
+                    }}
                       className="w-8 h-8 flex items-center justify-center hover:bg-muted"><Minus className="w-3 h-3" /></button>
                     <span className="w-8 text-center text-sm">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.productId, item.quantity + 1, item.color, item.size)}
+                    <button onClick={() => {
+                      if (item.quantity >= item.stock) {
+                        toast.error(`Only ${item.stock} available for size ${item.size || "this item"}`);
+                        return;
+                      }
+                      const ok = updateQuantity(item.productId, item.quantity + 1, item.color, item.size);
+                      if (!ok) toast.error(`Only ${item.stock} available for size ${item.size || "this item"}`);
+                    }}
                       className="w-8 h-8 flex items-center justify-center hover:bg-muted"><Plus className="w-3 h-3" /></button>
                   </div>
                   <button onClick={() => removeItem(item.productId, item.color, item.size)}

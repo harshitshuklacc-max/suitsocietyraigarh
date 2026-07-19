@@ -10,7 +10,7 @@ import { useState } from "react";
 
 import { motion, AnimatePresence } from "framer-motion";
 
-import { Search, ShoppingBag, Heart, User, Menu, X, Phone } from "lucide-react";
+import { Search, ShoppingBag, Heart, User, Menu, X } from "lucide-react";
 
 import { useCart } from "@/components/providers/cart-provider";
 
@@ -60,9 +60,7 @@ export function Header() {
 
       <div className="bg-luxury-black text-white text-xs py-1.5 text-center tracking-wider">
 
-        <Phone className="inline w-3 h-3 mr-1" />
-
-        {SITE_CONFIG.phone} | Free Delivery on orders above ₹2,999
+        📞 {SITE_CONFIG.phone} | Free delivery on all orders
 
       </div>
 
@@ -72,7 +70,7 @@ export function Header() {
 
         <div className="flex items-center justify-between h-16 md:h-20 gap-4 md:gap-8 lg:gap-12">
 
-          <button className="md:hidden shrink-0" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+          <button className="lg:hidden shrink-0" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
 
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
 
@@ -238,11 +236,11 @@ export function Header() {
 
             exit={{ height: 0, opacity: 0 }}
 
-            className="lg:hidden border-t overflow-hidden"
+            className="lg:hidden border-t overflow-hidden max-h-[75vh] overflow-y-auto"
 
           >
 
-            <div className="container mx-auto px-4 py-4 space-y-3">
+            <div className="container mx-auto px-4 py-4 space-y-1">
 
               {NAV_ITEMS.map((item) => (
 
@@ -252,7 +250,7 @@ export function Header() {
 
                   href={item.href}
 
-                  className="block py-2 text-sm tracking-wider"
+                  className="block py-2.5 text-sm tracking-wider border-b border-border/40 last:border-0"
 
                   onClick={() => setMobileOpen(false)}
 
@@ -264,9 +262,21 @@ export function Header() {
 
               ))}
 
-              <Link href="/wishlist" className="block py-2 text-sm tracking-wider" onClick={() => setMobileOpen(false)}>
+              <Link href="/wishlist" className="block py-2.5 text-sm tracking-wider border-b border-border/40" onClick={() => setMobileOpen(false)}>
 
                 WISHLIST
+
+              </Link>
+
+              <Link href="/account" className="block py-2.5 text-sm tracking-wider border-b border-border/40" onClick={() => setMobileOpen(false)}>
+
+                MY ACCOUNT
+
+              </Link>
+
+              <Link href="/cart" className="block py-2.5 text-sm tracking-wider" onClick={() => setMobileOpen(false)}>
+
+                CART {itemCount > 0 ? `(${itemCount})` : ""}
 
               </Link>
 

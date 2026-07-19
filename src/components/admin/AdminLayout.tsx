@@ -24,6 +24,8 @@ import {
   LogOut,
   Menu,
   X,
+  Palette,
+  Ruler,
   Crown,
 } from "lucide-react";
 import { useState } from "react";
@@ -36,6 +38,8 @@ const NAV_ITEMS = [
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/brands", label: "Brands", icon: Tag },
   { href: "/admin/fabrics", label: "Fabrics", icon: Layers },
+  { href: "/admin/colors", label: "Colors", icon: Palette },
+  { href: "/admin/sizes", label: "Sizes", icon: Ruler },
   { href: "/admin/inventory", label: "Inventory", icon: Warehouse },
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { href: "/admin/customers", label: "Customers", icon: Users },
