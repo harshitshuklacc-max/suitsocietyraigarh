@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { initializeDatabase } from "@/lib/init-db";
+import { initializeDatabase, runMigrations } from "@/lib/init-db";
 import { initializeDefaultAdmin } from "@/lib/auth";
 import { ensureStorageBuckets } from "@/lib/storage-setup";
 
@@ -34,6 +34,16 @@ export async function POST(request: Request) {
     const result = await initializeDatabase(dbPassword);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    const migrations = await runMigrations(dbPassword);
+    if (!migrations.success) {
+      return NextResponse.json({
+        success: true,
+        message:
+          migrations.error ||
+          "Database initialized. Run migrations from Admin → Settings if product creation fails.",
+      });
     }
 
     try {

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import postgres from "postgres";
 
@@ -124,6 +124,60 @@ async function tryRunSchema(connectionString: string, schema: string): Promise<{
   }
 }
 
+function getMigrationFiles(): string[] {
+  const migrationsDir = join(process.cwd(), "supabase", "migrations");
+  if (!existsSync(migrationsDir)) return [];
+
+  return readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(".sql"))
+    .sort()
+    .map((file) => join(migrationsDir, file));
+}
+
+async function runWithPassword(
+  dbPassword: string,
+  run: (connectionString: string) => Promise<{ ok: boolean; error?: string }>
+): Promise<{ success: boolean; error?: string }> {
+  const urls = buildConnectionUrls(dbPassword);
+  if (!urls.length) {
+    return { success: false, error: "Could not build database connection URL." };
+  }
+
+  let lastError = "Could not connect to database. Check your Supabase database password.";
+
+  for (const connectionString of urls) {
+    const result = await run(connectionString);
+    if (result.ok) return { success: true };
+    lastError = result.error || lastError;
+  }
+
+  return { success: false, error: lastError };
+}
+
+export async function runMigrations(dbPassword?: string): Promise<{ success: boolean; error?: string }> {
+  const password = dbPassword || process.env.SUPABASE_DB_PASSWORD;
+  if (!password) {
+    return {
+      success: false,
+      error: "Database password required. Set SUPABASE_DB_PASSWORD or pass dbPassword.",
+    };
+  }
+
+  const migrationFiles = getMigrationFiles();
+  if (!migrationFiles.length) {
+    return { success: true };
+  }
+
+  return runWithPassword(password, async (connectionString) => {
+    for (const filePath of migrationFiles) {
+      const sql = readFileSync(filePath, "utf8");
+      const result = await tryRunSchema(connectionString, sql);
+      if (!result.ok) return result;
+    }
+    return { ok: true };
+  });
+}
+
 export async function initializeDatabase(dbPassword?: string): Promise<{ success: boolean; error?: string }> {
   const password = dbPassword || process.env.SUPABASE_DB_PASSWORD;
   if (!password) {
@@ -150,7 +204,14 @@ export async function initializeDatabase(dbPassword?: string): Promise<{ success
       const boot = await tryRunSchema(connectionString, bootstrap);
       if (boot.ok) {
         const full = await tryRunSchema(connectionString, schema);
-        if (full.ok) return { success: true };
+        if (full.ok) {
+          const migrations = await runMigrations(password);
+          if (migrations.success) return { success: true };
+          return {
+            success: true,
+            error: migrations.error || "Schema OK. Run pending migrations from Admin → Settings.",
+          };
+        }
         return { success: true, error: "Bootstrap OK. Some full-schema steps may need manual SQL Editor run." };
       }
       lastError = boot.error || lastError;
@@ -158,7 +219,14 @@ export async function initializeDatabase(dbPassword?: string): Promise<{ success
     }
 
     const result = await tryRunSchema(connectionString, schema);
-    if (result.ok) return { success: true };
+    if (result.ok) {
+      const migrations = await runMigrations(password);
+      if (migrations.success) return { success: true };
+      return {
+        success: true,
+        error: migrations.error || "Schema OK. Some migrations may need manual SQL Editor run.",
+      };
+    }
     lastError = result.error || lastError;
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Shield, Plus, X } from "lucide-react";
+import { Loader2, Shield, Plus, X, Database } from "lucide-react";
 import { toast } from "sonner";
 import {
   AdminLayout,
@@ -22,6 +22,9 @@ export default function AdminSettingsPage() {
   const [catalogSizes, setCatalogSizes] = useState<string[]>([]);
   const [newSize, setNewSize] = useState("");
   const [savingSizes, setSavingSizes] = useState(false);
+  const [needsMigration, setNeedsMigration] = useState(false);
+  const [migrationPassword, setMigrationPassword] = useState("");
+  const [migrating, setMigrating] = useState(false);
   const [admin, setAdmin] = useState<{ username: string; must_change_credentials?: boolean } | null>(null);
   const [form, setForm] = useState({
     username: "",
@@ -46,6 +49,11 @@ export default function AdminSettingsPage() {
         }
       })
       .finally(() => setLoading(false));
+
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data) => setNeedsMigration(Boolean(data.needsMigration)))
+      .catch(() => undefined);
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -153,6 +161,25 @@ export default function AdminSettingsPage() {
     await saveCatalogSizes(catalogSizes.filter((item) => item !== size));
   };
 
+  const handleRunMigrations = async () => {
+    setMigrating(true);
+    try {
+      const res = await fetch("/api/admin/migrate-schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dbPassword: migrationPassword || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Migration failed");
+      toast.success("Database migrations applied. You can add products now.");
+      setNeedsMigration(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Migration failed");
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -171,6 +198,13 @@ export default function AdminSettingsPage() {
         <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm flex items-center gap-2">
           <Shield className="w-4 h-4" />
           Please change your default credentials after first login.
+        </div>
+      )}
+
+      {needsMigration && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">
+          Product columns are missing in your database (`cost_price`, `discount_percent`, `size_stock`).
+          Apply migrations below before adding products.
         </div>
       )}
 
@@ -302,6 +336,31 @@ export default function AdminSettingsPage() {
             )}
             <AdminButton type="button" onClick={handleSaveSizeChart} disabled={savingSizeChart}>
               {savingSizeChart ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Size Chart"}
+            </AdminButton>
+          </div>
+        </AdminCard>
+
+        <AdminCard>
+          <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+            <Database className="w-4 h-4 text-amber-400" />
+            Database Migrations
+          </h3>
+          <p className="text-sm text-zinc-400 mb-4">
+            Run this if product creation fails with a missing `cost_price` column error.
+            Uses your Supabase database password (Settings → Database in Supabase Dashboard).
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-1">Supabase Database Password</label>
+              <AdminInput
+                type="password"
+                value={migrationPassword}
+                onChange={(e) => setMigrationPassword(e.target.value)}
+                placeholder="Leave blank if SUPABASE_DB_PASSWORD is in .env.local"
+              />
+            </div>
+            <AdminButton type="button" onClick={handleRunMigrations} disabled={migrating}>
+              {migrating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply Database Migrations"}
             </AdminButton>
           </div>
         </AdminCard>

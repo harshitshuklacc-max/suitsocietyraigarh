@@ -8,6 +8,18 @@ import { parseFilterList, PRICE_RANGES, mergeUniqueColors, FILTER_COLORS, sortSi
 import { parseSizeStock, syncProductTotalStock, buildSizeStockFromForm } from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 
+function formatDbSchemaError(message: string): string {
+  if (
+    message.includes("cost_price") ||
+    message.includes("discount_percent") ||
+    message.includes("size_stock") ||
+    (message.includes("schema cache") && message.includes("products"))
+  ) {
+    return "Database migration required: missing product columns (cost_price, discount_percent, size_stock). Go to Admin → Settings → Database Migrations and click Apply, or run supabase/migrations/005_product_enhancements.sql in Supabase SQL Editor.";
+  }
+  return message;
+}
+
 export async function getCategories(): Promise<Category[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -311,7 +323,7 @@ async function saveProductImage(productId: string, file: File, options?: { isPri
     is_primary: isPrimary,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: formatDbSchemaError(error.message) };
   return { success: true };
 }
 
@@ -479,7 +491,7 @@ export async function createProduct(formData: FormData) {
     slug: slugify(payload.name) + "-" + Date.now().toString(36),
   }).select().single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: formatDbSchemaError(error.message) };
 
   const imageFile = formData.get("image") as File | null;
   if (imageFile && imageFile.size > 0) {
@@ -520,7 +532,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const barcode = await resolveProductBarcode(supabase, payload.sku, id);
 
   const { error } = await supabase.from("products").update({ ...payload, barcode }).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: formatDbSchemaError(error.message) };
 
   const imageFile = formData.get("image") as File | null;
   if (imageFile && imageFile.size > 0) {
@@ -543,7 +555,7 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   const supabase = await createServiceClient();
   const { error } = await supabase.from("products").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: formatDbSchemaError(error.message) };
   revalidatePath("/admin/products");
   revalidatePath("/products");
   return { success: true };
@@ -558,7 +570,7 @@ export async function deleteAllProducts() {
   await supabase.from("product_images").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await supabase.from("inventory").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   const { error } = await supabase.from("products").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  if (error) return { error: error.message };
+  if (error) return { error: formatDbSchemaError(error.message) };
 
   revalidatePath("/admin/products");
   revalidatePath("/products");

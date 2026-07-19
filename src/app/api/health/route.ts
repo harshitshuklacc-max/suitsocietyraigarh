@@ -16,9 +16,30 @@ export async function GET() {
         status: needsSchema ? "needs_schema" : "error",
         service: "Suit Society",
         dbReady: false,
+        needsMigration: false,
         message: needsSchema
           ? "Run supabase/schema.sql in your Supabase SQL Editor."
           : error.message,
+      });
+    }
+
+    const { error: migrationError } = await supabase.from("products").select("cost_price").limit(1);
+    const needsMigration = Boolean(
+      migrationError &&
+        (migrationError.message.includes("cost_price") ||
+          migrationError.message.includes("discount_percent") ||
+          migrationError.message.includes("size_stock") ||
+          migrationError.message.includes("schema cache"))
+    );
+
+    if (needsMigration) {
+      return NextResponse.json({
+        status: "needs_migration",
+        service: "Suit Society",
+        dbReady: true,
+        needsMigration: true,
+        message:
+          "Database is missing product columns (cost_price, discount_percent, size_stock). Run migrations from Admin → Settings or apply supabase/migrations/005_product_enhancements.sql in Supabase SQL Editor.",
       });
     }
 
@@ -26,12 +47,14 @@ export async function GET() {
       status: "ok",
       service: "Suit Society",
       dbReady: true,
+      needsMigration: false,
     });
   } catch {
     return NextResponse.json({
       status: "error",
       service: "Suit Society",
       dbReady: false,
+      needsMigration: false,
       message: "Could not connect to Supabase.",
     });
   }
