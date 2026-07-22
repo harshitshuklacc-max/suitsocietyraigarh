@@ -60,7 +60,7 @@ export function Header() {
 
       <div className="bg-luxury-black text-white text-xs py-1.5 text-center tracking-wider">
 
-        📞 {SITE_CONFIG.phone} | Free delivery on all orders
+        📞 {SITE_CONFIG.phones.join(" / ")} | Free delivery on all orders
 
       </div>
 
@@ -68,37 +68,47 @@ export function Header() {
 
       <div className="container mx-auto px-4">
 
-        <div className="flex items-center justify-between h-16 md:h-20 gap-4 md:gap-8 lg:gap-12">
+        <div className="flex items-center justify-between h-16 md:h-20 gap-3 md:gap-8 lg:gap-12">
 
-          <button className="lg:hidden shrink-0" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 lg:flex-none">
 
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            <button className="lg:hidden shrink-0" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
 
-          </button>
+              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+
+            </button>
 
 
 
-          <Link href="/" className="flex items-center shrink-0">
+            <Link href="/" className="flex items-center gap-2 md:gap-3 shrink-0 min-w-0">
 
-            <div className="relative h-10 md:h-12 w-[120px] md:w-[140px]">
+              <div className="relative h-10 w-10 md:h-12 md:w-12 shrink-0">
 
-              <Image
+                <Image
 
-                src="/logo.jpeg"
+                  src="/logo.jpeg"
 
-                alt="Suit Society"
+                  alt="Suit Society"
 
-                fill
+                  fill
 
-                className="object-contain object-left"
+                  className="object-contain object-left"
 
-                priority
+                  priority
 
-              />
+                />
 
-            </div>
+              </div>
 
-          </Link>
+              <span className="font-bold font-serif text-sm sm:text-base md:text-xl tracking-[0.15em] whitespace-nowrap">
+
+                SUIT SOCIETY
+
+              </span>
+
+            </Link>
+
+          </div>
 
 
 

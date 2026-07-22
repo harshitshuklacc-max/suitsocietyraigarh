@@ -49,9 +49,15 @@ export function Footer() {
                 <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
                 <span>{SITE_CONFIG.address}</span>
               </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-gold" />
-                <a href={`tel:${SITE_CONFIG.phone}`} className="hover:text-gold">{SITE_CONFIG.phone}</a>
+              <li className="flex items-start gap-2">
+                <Phone className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+                <div className="flex flex-col gap-1">
+                  {SITE_CONFIG.phones.map((phone) => (
+                    <a key={phone} href={`tel:${phone}`} className="hover:text-gold">
+                      {phone}
+                    </a>
+                  ))}
+                </div>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-gold" />

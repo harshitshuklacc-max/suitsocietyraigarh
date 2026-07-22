@@ -97,7 +97,8 @@ export function truncate(text: string, length: number): string {
 export const SITE_CONFIG = {
   name: "Suit Society",
   email: "suitsocietyofficial@gmail.com",
-  phone: "8120650803",
+  phone: "07974100362",
+  phones: ["07974100362", "8120650803"],
   whatsapp: "918120650803",
   address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk Channel, Raigarh, Chhattisgarh - 496001",
   defaultAdmin: {
