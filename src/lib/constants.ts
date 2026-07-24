@@ -3,7 +3,7 @@ export const BRAND = {
   tagline: "Luxury Ethnic & Formal Wear",
   email: "suitsocietyofficial@gmail.com",
   phone: "07974100362",
-  address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk Channel, Raigarh, Chhattisgarh - 496001",
+  address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk, Raigarh, Chhattisgarh - 496001",
   city: "Raigarh",
   state: "Chhattisgarh",
   pincode: "496001",

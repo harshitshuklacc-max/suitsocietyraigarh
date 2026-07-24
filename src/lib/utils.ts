@@ -100,7 +100,7 @@ export const SITE_CONFIG = {
   phone: "07974100362",
   phones: ["07974100362", "8120650803"],
   whatsapp: "917974100362",
-  address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk Channel, Raigarh, Chhattisgarh - 496001",
+  address: "Kewdabadi Bus Stand Road, Near SBI Bank Chowk, Raigarh, Chhattisgarh - 496001",
   defaultAdmin: {
     username: "SUiTsOcIety",
     password: "SuitXSociety@123897254",

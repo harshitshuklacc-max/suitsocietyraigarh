@@ -12,7 +12,7 @@ export function Footer() {
               SUIT <span className="text-gold">SOCIETY</span>
             </h3>
             <p className="text-white/70 text-sm leading-relaxed">
-              Premium luxury fashion for the modern gentleman. Crafted with excellence in Raigarh, Chhattisgarh.
+              Premium luxury fashion for the modern women. Crafted with excellence in Raigarh, Chhattisgarh.
             </p>
             <div className="flex gap-4 mt-6">
               <a href="#" className="hover:text-gold transition-colors" aria-label="Instagram"><Instagram className="w-5 h-5" /></a>
